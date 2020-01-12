@@ -3,23 +3,25 @@ use std::ffi::OsString;
 use std::path::Path;
 use crate::query::checkers::checker::Checker;
 
-pub struct BundleChecker {
-    bundle_extensions: HashSet<OsString>
+lazy_static! {
+    /// Extensions that can be identified as bundles
+    pub static ref EXTENSIONS: HashSet<OsString> = vec!["app", "prefPane"]
+                                                    .into_iter().map(OsString::from).collect();
 }
 
+/// Checker that checks if a file path is a bundle by inspecting its extensions
+pub struct BundleChecker;
+
 impl Checker for BundleChecker {
+
     fn new() -> Self {
-        BundleChecker {
-            bundle_extensions: vec!["app", "prefPane"].into_iter().map(OsString::from).collect()
-        }
+        BundleChecker {}
     }
 
     fn is_legit(&self, path: &Path) -> bool {
-        if let Some(extension) = path.extension() {
-            self.bundle_extensions.contains(extension)
-        } else {
-            false
-        }
+        path.extension()
+            .and_then(|ext| Some(EXTENSIONS.contains(ext)))
+            .unwrap_or(false)
     }
 }
 
@@ -31,7 +33,7 @@ mod bundle_checker_test {
 
     #[test]
     fn test_is_bundle_app() {
-        assert!(BundleChecker::new().is_legit(Path::new("/System/Applications/Safari.app")));
+        assert!(BundleChecker::new().is_legit(Path::new("/System/Applications/Books.app")));
     }
 
     #[test]

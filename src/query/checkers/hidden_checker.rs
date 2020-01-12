@@ -2,7 +2,8 @@ use crate::query::checkers::checker::Checker;
 use std::path::Path;
 use std::ffi::OsStr;
 
-struct HiddenChecker;
+/// Checker that checks if a path is hidden by checking its prefix dot
+pub struct HiddenChecker;
 
 impl Checker for HiddenChecker {
     fn new() -> Self {

@@ -1,5 +1,5 @@
 [package]
-name = "ApplicationService"
+name = "launch_service"
 version = "0.1.0"
 authors = ["Yaxin Cheng <yaxin.cheng@dal.ca>"]
 edition = "2018"
@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 dirs = "2.0.2"
+lazy_static = "1.4.0"
