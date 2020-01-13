@@ -1,0 +1,13 @@
+configurable:
+  ignorePaths:
+    displayName: "Paths to Ignore"
+    values: []
+internal:
+  cached:
+    - "/System/Library/CoreServices/Finder.app"
+    - "/System/Library/CoreServices/Applications"
+    - "/System/Library/PreferencePanes"
+    - "/System/Applications"
+  updated:
+    - "~/Applications"
+    - "/Applications"

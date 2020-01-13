@@ -28,7 +28,7 @@ impl <B: Checker, H: Checker> QueryProcessor<B, H> {
                                                        .map(|entry| entry.path())
                                                        .flat_map(|entry| self.walk_dir(entry))
                                                        .collect(),
-            (_, true, false) | (Err(_), false, false) => vec![entry],
+            (_, true, false) => vec![entry],
             _ => vec![]
         }
     }

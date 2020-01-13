@@ -1,5 +1,6 @@
+mod configurator;
 mod query;
-extern crate dirs;
+mod utils;
 #[macro_use] extern crate lazy_static;
 
 fn main() {
