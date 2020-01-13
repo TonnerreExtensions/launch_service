@@ -11,10 +11,11 @@ impl Checker for HiddenChecker {
     }
 
     fn is_legit(&self, path: &Path) -> bool {
-        path.file_stem()
-            .and_then(OsStr::to_str)
-            .and_then(|name| Some(name.starts_with(".")))
-            .unwrap_or(false)
+        path.to_str().map(str::len).unwrap_or(0) <= 1 ||
+            path.file_stem()
+                .and_then(OsStr::to_str)
+                .and_then(|name| Some(name.starts_with(".")))
+                .unwrap_or(false)
     }
 }
 
