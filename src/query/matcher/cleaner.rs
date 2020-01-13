@@ -18,8 +18,8 @@ fn tokenize_camel_case<'a>(name: &'a str) -> Vec<&'a str> {
     let mut tokens = Vec::<&'a str>::new();
     let mut start_index: usize = 0;
     let mut prev_is_capital: u8 = name.chars().next()
-                                        .expect("name is empty")
-                                        .is_uppercase() as u8;
+        .expect("name is empty")
+        .is_uppercase() as u8;
     let is_case_different = |prev: u8, curr: u8| prev ^ curr == 1;
     for (index, character) in name.char_indices() {
         if is_case_different(prev_is_capital, character.is_uppercase() as u8) &&

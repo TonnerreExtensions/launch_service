@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::Path;
+
 use crate::query::checkers::checker::Checker;
 
 lazy_static! {
@@ -13,7 +14,6 @@ lazy_static! {
 pub struct BundleChecker;
 
 impl Checker for BundleChecker {
-
     fn new() -> Self {
         BundleChecker {}
     }
@@ -27,9 +27,10 @@ impl Checker for BundleChecker {
 
 #[cfg(test)]
 mod bundle_checker_test {
+    use std::path::Path;
+
     use crate::query::checkers::BundleChecker;
     use crate::query::checkers::checker::Checker;
-    use std::path::Path;
 
     #[test]
     fn test_is_bundle_app() {

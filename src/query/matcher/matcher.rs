@@ -20,15 +20,13 @@ fn initial_match(query: &str, target: &str) -> bool {
 ///     - `am` matches with `*A*ctivity *M*onitor`
 ///     - `actmo` matches with `**Act**ivity **Mo**nitor`
 fn match_components_prefix(query: &str, target: &[&str]) -> bool {
-    if query.is_empty() { true }
-    else if target.is_empty() { false }
-    else {
+    if query.is_empty() { true } else if target.is_empty() { false } else {
         let processing = target.first()
-                                .expect("Get first target component failed");
+            .expect("Get first target component failed");
         for (index, (query_char, target_char)) in query.chars()
             .zip(processing.chars()).enumerate() {
             if query_char.eq_ignore_ascii_case(&target_char) {
-                if match_components_prefix(&query[index+1..], &target[1..]) {
+                if match_components_prefix(&query[index + 1..], &target[1..]) {
                     return true;
                 }
             } else { break; }

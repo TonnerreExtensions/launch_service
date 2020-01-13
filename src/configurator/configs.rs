@@ -29,11 +29,12 @@ impl Configs {
         let content = std::fs::read_to_string(config_file)?;
         match YamlLoader::load_from_str(&content) {
             Ok(mut files) => Ok(
-                Configs { file: match files.pop() {
-                    Some(file) => file,
-                    None => return Err(io::Error::new(ErrorKind::InvalidData, "Failed to pop last of yaml"))
-                }
-            }),
+                Configs {
+                    file: match files.pop() {
+                        Some(file) => file,
+                        None => return Err(io::Error::new(ErrorKind::InvalidData, "Failed to pop last of yaml"))
+                    }
+                }),
             Err(err) => Err(io::Error::new(ErrorKind::InvalidData, err))
         }
     }
