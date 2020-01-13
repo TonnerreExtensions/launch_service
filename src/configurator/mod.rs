@@ -1,1 +1,3 @@
-mod loader;
+pub use configs::Configs;
+
+mod configs;

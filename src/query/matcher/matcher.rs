@@ -1,5 +1,4 @@
 use crate::query::matcher::cleaner::tokenize_and_clean;
-use std::collections::VecDeque;
 
 pub fn match_query(query: &str, target: &str) -> bool {
     prefix_match(query, target) || initial_match(query, target)
@@ -40,7 +39,7 @@ fn match_components_prefix(query: &str, target: &[&str]) -> bool {
 
 #[cfg(test)]
 mod matcher_test {
-    use crate::query::matcher::matcher::{prefix_match, initial_match};
+    use crate::query::matcher::matcher::{initial_match, prefix_match};
 
     #[test]
     fn test_prefix_match() {
