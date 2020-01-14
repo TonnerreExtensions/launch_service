@@ -1,16 +1,21 @@
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
 
+use crate::utils::serde::BinaryStyle;
+
 pub trait Deserializable {
-    fn deserialize(bytes: Vec<u8>) -> Result<Self, FromUtf8Error>
+    fn deserialize(mut bytes: Vec<u8>) -> Result<Self, FromUtf8Error>
         where Self: std::marker::Sized;
 }
 
-pub fn deserialize<D: Deserializable>(bytes: &mut Vec<u8>) -> Result<D, FromUtf8Error> {
+/// TODO: Supports reference
+pub fn deserialize_from_bytes<D: Deserializable>(bytes: &mut Vec<u8>) -> Result<D, FromUtf8Error> {
     let size = read_len(bytes);
-    D::deserialize(
-        bytes.drain(..size as usize).collect()
-    )
+    let style: BinaryStyle = bytes.remove(0).into();
+    match style {
+        BinaryStyle::Value => D::deserialize(bytes.drain(..size as usize).collect()),
+        BinaryStyle::Reference => unimplemented!("Enable a storage with index that allows pick up")
+    }
 }
 
 /// Read a usize from the vec
@@ -26,20 +31,15 @@ fn read_len(bytes: &mut Vec<u8>) -> u32 {
     u32::from_be_bytes(res)
 }
 
-impl Deserializable for PathBuf {
-    fn deserialize(bytes: Vec<u8>) -> Result<PathBuf, FromUtf8Error> {
-        unimplemented!()
-    }
-}
-
 #[cfg(test)]
 mod deserializer_test {
     use std::string::FromUtf8Error;
 
-    use crate::utils::serde::deserializer::{Deserializable, deserialize, read_len};
+    use crate::utils::serde::BinaryStyle;
+    use crate::utils::serde::deserializer::{Deserializable, deserialize_from_bytes, read_len};
 
     impl Deserializable for String {
-        fn deserialize(bytes: Vec<u8>) -> Result<Self, FromUtf8Error> where Self: std::marker::Sized {
+        fn deserialize(mut bytes: Vec<u8>) -> Result<Self, FromUtf8Error> where Self: std::marker::Sized {
             String::from_utf8(bytes)
         }
     }
@@ -56,8 +56,8 @@ mod deserializer_test {
 
     #[test]
     fn test_deserialize() {
-        let mut bytes: Vec<u8> = vec![0, 0, 0, 5, 72, 101, 108, 108, 111];
-        let res: String = deserialize(&mut bytes).unwrap();
+        let mut bytes: Vec<u8> = vec![0, 0, 0, 5, 0, 72, 101, 108, 108, 111];
+        let res: String = deserialize_from_bytes(&mut bytes).unwrap();
         assert_eq!(res, "Hello")
     }
 }

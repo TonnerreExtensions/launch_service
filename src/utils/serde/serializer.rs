@@ -1,41 +1,39 @@
 use std::path::PathBuf;
 
+use crate::utils::serde::BinaryStyle;
+
 pub trait Serializable {
     fn serialize(&self) -> Vec<u8>;
+    fn identify(&self) -> BinaryStyle;
 }
 
-/// Serialize object to [size;bytes] format
-pub fn serialize<S: Serializable>(obj: S) -> Vec<u8> {
-    let bytes = obj.serialize();
-    let size = bytes.len() as u32;
-    size.to_be_bytes()
-        .to_vec()
-        .into_iter()
-        .chain(bytes.into_iter())
-        .collect()
-}
-
-impl Serializable for PathBuf {
-    fn serialize(&self) -> Vec<u8> {
-        /// TODO: serialize pathbuf
-        unimplemented!()
-    }
+/// Serialize object to [size;type;bytes] format
+pub fn serialize_to_bytes<S: Serializable>(obj: S) -> Vec<u8> {
+    let mut bytes = obj.serialize();
+    let mut size = (bytes.len() as u32).to_be_bytes().to_vec();
+    size.push(obj.identify().convert_to_byte());
+    size.append(&mut bytes);
+    size
 }
 
 #[cfg(test)]
 mod serialize_test {
-    use crate::utils::serde::serializer::{Serializable, serialize};
+    use crate::utils::serde::BinaryStyle;
+    use crate::utils::serde::serializer::{Serializable, serialize_to_bytes};
 
     impl Serializable for String {
         fn serialize(&self) -> Vec<u8> {
             self.as_bytes().to_vec()
+        }
+        fn identify(&self) -> BinaryStyle {
+            BinaryStyle::Value
         }
     }
 
     #[test]
     fn test_serialize_string() {
         let test = "Hello".to_owned();
-        let serialized = serialize(test);
-        assert_eq!(serialized, vec![0, 0, 0, 5, 72, 101, 108, 108, 111]);
+        let serialized = serialize_to_bytes(test);
+        assert_eq!(serialized, vec![0, 0, 0, 5, 0, 72, 101, 108, 108, 111]);
     }
 }

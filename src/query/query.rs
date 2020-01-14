@@ -4,9 +4,10 @@ use std::path::{Path, PathBuf};
 use crate::configurator::Configs;
 use crate::query::checkers::{BundleChecker, Checker, HiddenChecker, IgnoreChecker};
 use crate::query::matcher;
+use crate::query::service::Service;
 use crate::utils::cache::CacheManager;
 use crate::utils::serde::serializer;
-use crate::utils::serde::serializer::serialize;
+use crate::utils::serde::serializer::serialize_to_bytes;
 
 pub struct QueryProcessor {
     config: Configs,
@@ -37,26 +38,32 @@ impl QueryProcessor {
 
     pub fn query(&self, req: String) -> Vec<u8> {
         let cache_manager = CacheManager::new();
-        let cache_loaded: Vec<PathBuf> = cache_manager.bunch_read();
-        let cached_paths = if cache_loaded.is_empty() {
+        let cache_loaded: Vec<Service> = cache_manager.bunch_read();
+        let cached_services = if cache_loaded.is_empty() {
             cache_manager.bunch_save(
                 self.config.get_internal_cached()
                     .into_iter()
                     .flat_map(|path| self.walk_dir(path))
+                    .filter(|path| path.to_str().is_some())
+                    .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
+                    .map(Service::new)
                     .collect()
             )
         } else {
             cache_loaded
         };
-        let updated_paths: Vec<PathBuf> = self.config.get_internal_updated()
+
+        let updated_services: Vec<Service> = self.config.get_internal_updated()
             .into_iter()
             .flat_map(|path| self.walk_dir(path))
-            .collect();
-        cached_paths.into_iter()
-            .chain(updated_paths.into_iter())
             .filter(|path| path.to_str().is_some())
             .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
-            .flat_map(serializer::serialize)
+            .map(Service::new)
+            .collect();
+
+        cached_services.into_iter()
+            .chain(updated_services.into_iter())
+            .flat_map(serializer::serialize_to_bytes)
             .collect()
     }
 

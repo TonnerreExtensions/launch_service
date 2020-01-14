@@ -1,4 +1,6 @@
+pub use query::QueryProcessor;
+
 mod query;
 mod checkers;
 mod matcher;
-pub use query::QueryProcessor;
+mod service;
