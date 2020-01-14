@@ -1,18 +1,33 @@
 use std::fs::read_dir;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use crate::query::checkers::Checker;
+use crate::configurator::Configs;
+use crate::query::checkers::{BundleChecker, Checker, HiddenChecker, IgnoreChecker};
 
-pub struct QueryProcessor<B: Checker, H: Checker> {
-    bundle_checker: B,
-    hidden_checker: H,
+pub struct QueryProcessor {
+    config: Configs,
+    condition_checker: Box<dyn Checker>,
+    terminate_checkers: Vec<Box<dyn Checker>>,
 }
 
-impl<B: Checker, H: Checker> QueryProcessor<B, H> {
+impl QueryProcessor {
+    const CONFIG_PATH: &'static str = "settings.yaml";
+
     pub fn new() -> Self {
+        let config = Configs::from(Path::new(Self::CONFIG_PATH))
+            .expect("settings.yaml is missing");
+        let ignore_paths = config.get_ignore_paths();
         QueryProcessor {
-            bundle_checker: B::new(),
-            hidden_checker: H::new(),
+            config,
+            condition_checker: Box::new(BundleChecker::new()),
+            terminate_checkers: if ignore_paths.is_empty() {
+                vec![Box::new(HiddenChecker::new())]
+            } else {
+                vec![
+                    Box::new(HiddenChecker::new()),
+                    Box::new(IgnoreChecker::new(ignore_paths))
+                ]
+            },
         }
     }
 
@@ -21,10 +36,10 @@ impl<B: Checker, H: Checker> QueryProcessor<B, H> {
     }
 
     fn walk_dir(&self, entry: PathBuf) -> Vec<PathBuf> {
-        match (read_dir(&entry),
-               self.bundle_checker.is_legit(&entry),
-               self.hidden_checker.is_legit(&entry)
-        ) {
+        let terminate_condition = self.terminate_checkers.iter()
+            .any(|checker| checker.is_legit(&entry));
+        let eligible_condition = self.condition_checker.is_legit(&entry);
+        match (read_dir(&entry), eligible_condition, terminate_condition) {
             (Ok(files), false, false) => files.filter_map(Result::ok)
                 .map(|entry| entry.path())
                 .flat_map(|entry| self.walk_dir(entry))
@@ -43,7 +58,7 @@ mod query_test {
     use crate::query::checkers::{BundleChecker, HiddenChecker};
     use crate::query::query::QueryProcessor;
 
-    type QP = QueryProcessor<BundleChecker, HiddenChecker>;
+    type QP = QueryProcessor;
 
     const APP_PATH: &str = "/System/Applications/Books.app";
     const APP_FOLDER_PATH: &str = "/System/Applications";

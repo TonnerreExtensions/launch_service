@@ -1,5 +1,6 @@
 extern crate yaml_rust;
 
+use std::collections::HashSet as Set;
 use std::io;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -40,25 +41,25 @@ impl Configs {
     }
 
     /// Get ignored path
-    pub fn get_ignore_paths(&self) -> Vec<PathBuf> {
+    pub fn get_ignore_paths(&self) -> Set<PathBuf> {
         self.file[Self::CONFIGURABLE_KEY][Self::IGNORE_KEY][Self::VALUES_KEY]
             .as_vec().map(Self::convert_and_box).unwrap_or_default()
     }
 
     /// Get paths need to be cached
-    pub fn get_internal_cached(&self) -> Vec<PathBuf> {
+    pub fn get_internal_cached(&self) -> Set<PathBuf> {
         self.file[Self::INTERNAL_KEY][Self::CACHED_KEY]
             .as_vec().map(Self::convert_and_box).unwrap_or_default()
     }
 
     /// Get paths that updates every time
-    pub fn get_internal_updated(&self) -> Vec<PathBuf> {
+    pub fn get_internal_updated(&self) -> Set<PathBuf> {
         self.file[Self::INTERNAL_KEY][Self::UPDATED_KEY]
             .as_vec().map(Self::convert_and_box).unwrap_or_default()
     }
 
     /// Convert yaml data to str and box with vec
-    fn convert_and_box(data: &Vec<Yaml>) -> Vec<PathBuf> {
+    fn convert_and_box(data: &Vec<Yaml>) -> Set<PathBuf> {
         data.iter().filter_map(Yaml::as_str)
             .map(utils::expand_tilde)
             .collect()

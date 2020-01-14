@@ -13,11 +13,13 @@ lazy_static! {
 /// Checker that checks if a file path is a bundle by inspecting its extensions
 pub struct BundleChecker;
 
-impl Checker for BundleChecker {
-    fn new() -> Self {
+impl BundleChecker {
+    pub fn new() -> Self {
         BundleChecker {}
     }
+}
 
+impl Checker for BundleChecker {
     fn is_legit(&self, path: &Path) -> bool {
         path.extension()
             .and_then(|ext| Some(EXTENSIONS.contains(ext)))

@@ -1,15 +1,18 @@
-use crate::query::checkers::checker::Checker;
-use std::path::Path;
 use std::ffi::OsStr;
+use std::path::Path;
+
+use crate::query::checkers::checker::Checker;
 
 /// Checker that checks if a path is hidden by checking its prefix dot
 pub struct HiddenChecker;
 
-impl Checker for HiddenChecker {
-    fn new() -> Self {
+impl HiddenChecker {
+    pub fn new() -> Self {
         HiddenChecker {}
     }
+}
 
+impl Checker for HiddenChecker {
     fn is_legit(&self, path: &Path) -> bool {
         path.to_str().map(str::len).unwrap_or(0) <= 1 ||
             path.file_stem()
@@ -21,9 +24,10 @@ impl Checker for HiddenChecker {
 
 #[cfg(test)]
 mod hidden_checker_test {
-    use crate::query::checkers::hidden_checker::HiddenChecker;
-    use crate::query::checkers::checker::Checker;
     use std::path::Path;
+
+    use crate::query::checkers::checker::Checker;
+    use crate::query::checkers::hidden_checker::HiddenChecker;
 
     #[test]
     fn test_is_hidden() {
