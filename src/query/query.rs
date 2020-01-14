@@ -35,8 +35,7 @@ impl QueryProcessor {
         }
     }
 
-    /// TODO: store bytes as "size;bytes" format
-    pub fn query(&self, req: String) -> Vec<Vec<u8>> {
+    pub fn query(&self, req: String) -> Vec<u8> {
         let cache_manager = CacheManager::new();
         let cache_loaded: Vec<PathBuf> = cache_manager.bunch_read();
         let cached_paths = if cache_loaded.is_empty() {
@@ -57,7 +56,7 @@ impl QueryProcessor {
             .chain(updated_paths.into_iter())
             .filter(|path| path.to_str().is_some())
             .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
-            .map(serializer::serialize)
+            .flat_map(serializer::serialize)
             .collect()
     }
 
