@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 lazy_static! {
-    pub static ref STOP_WORDS: HashSet<&'static str> = vec!["and", "&"].into_iter().collect();
+    pub static ref STOP_WORDS: HashSet<&'static str> = vec!["and", "&", "And"].into_iter().collect();
 }
 
 pub fn tokenize_and_clean(name: &str) -> Vec<&str> {

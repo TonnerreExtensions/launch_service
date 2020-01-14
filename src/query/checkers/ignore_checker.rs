@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use crate::configurator::Configs;
 use crate::query::checkers::Checker;
 
 /// Checks if the path should be ignored

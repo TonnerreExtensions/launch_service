@@ -3,6 +3,10 @@ use std::path::{Path, PathBuf};
 
 use crate::configurator::Configs;
 use crate::query::checkers::{BundleChecker, Checker, HiddenChecker, IgnoreChecker};
+use crate::query::matcher;
+use crate::utils::cache::CacheManager;
+use crate::utils::serde::serializer;
+use crate::utils::serde::serializer::serialize;
 
 pub struct QueryProcessor {
     config: Configs,
@@ -31,8 +35,30 @@ impl QueryProcessor {
         }
     }
 
-    pub fn query(&self, req: String) -> String {
-        unimplemented!()
+    /// TODO: store bytes as "size;bytes" format
+    pub fn query(&self, req: String) -> Vec<Vec<u8>> {
+        let cache_manager = CacheManager::new();
+        let cache_loaded: Vec<PathBuf> = cache_manager.bunch_read();
+        let cached_paths = if cache_loaded.is_empty() {
+            cache_manager.bunch_save(
+                self.config.get_internal_cached()
+                    .into_iter()
+                    .flat_map(|path| self.walk_dir(path))
+                    .collect()
+            )
+        } else {
+            cache_loaded
+        };
+        let updated_paths: Vec<PathBuf> = self.config.get_internal_updated()
+            .into_iter()
+            .flat_map(|path| self.walk_dir(path))
+            .collect();
+        cached_paths.into_iter()
+            .chain(updated_paths.into_iter())
+            .filter(|path| path.to_str().is_some())
+            .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
+            .map(serializer::serialize)
+            .collect()
     }
 
     fn walk_dir(&self, entry: PathBuf) -> Vec<PathBuf> {
