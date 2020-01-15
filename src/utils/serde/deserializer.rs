@@ -1,8 +1,7 @@
-use std::path::PathBuf;
 use std::string::FromUtf8Error;
 
 pub trait Deserializable {
-    fn deserialize(mut bytes: Vec<u8>) -> Result<Self, FromUtf8Error>
+    fn deserialize(bytes: Vec<u8>) -> Result<Self, FromUtf8Error>
         where Self: std::marker::Sized;
 }
 

@@ -7,7 +7,6 @@ use crate::query::matcher;
 use crate::query::service::Service;
 use crate::utils::cache::CacheManager;
 use crate::utils::serde::serializer;
-use crate::utils::serde::serializer::serialize_to_bytes;
 
 pub struct QueryProcessor {
     config: Configs,
@@ -37,32 +36,37 @@ impl QueryProcessor {
     }
 
     pub fn query(&self, req: String) -> Vec<u8> {
+        let cached_services = self.query_cached_services(&req);
+        let updated_services = self.query_updated_services(&req);
+        cached_services.into_iter()
+            .chain(updated_services.into_iter())
+            .collect()
+    }
+
+    fn query_cached_services(&self, req: &str) -> Vec<u8> {
         let cache_manager = CacheManager::new();
-        let cache_loaded: Vec<Service> = cache_manager.bunch_read();
-        let cached_services = if cache_loaded.is_empty() {
-            cache_manager.bunch_save(
+        match Some(cache_manager.bunch_read_bytes()) {
+            Some(cache) if !cache.is_empty() => cache,
+            _ => cache_manager.save_bytes(
                 self.config.get_internal_cached()
                     .into_iter()
                     .flat_map(|path| self.walk_dir(path))
                     .filter(|path| path.to_str().is_some())
                     .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
                     .map(Service::new)
+                    .flat_map(serializer::serialize_to_bytes)
                     .collect()
             )
-        } else {
-            cache_loaded
-        };
+        }
+    }
 
-        let updated_services: Vec<Service> = self.config.get_internal_updated()
+    fn query_updated_services(&self, req: &str) -> Vec<u8> {
+        self.config.get_internal_updated()
             .into_iter()
             .flat_map(|path| self.walk_dir(path))
             .filter(|path| path.to_str().is_some())
             .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
             .map(Service::new)
-            .collect();
-
-        cached_services.into_iter()
-            .chain(updated_services.into_iter())
             .flat_map(serializer::serialize_to_bytes)
             .collect()
     }
@@ -87,7 +91,6 @@ impl QueryProcessor {
 mod query_test {
     use std::path::PathBuf;
 
-    use crate::query::checkers::{BundleChecker, HiddenChecker};
     use crate::query::query::QueryProcessor;
 
     type QP = QueryProcessor;

@@ -1,12 +1,10 @@
-use std::path::PathBuf;
-
 pub trait Serializable {
     fn serialize(&self) -> Vec<u8>;
 }
 
 /// Serialize object to [size;type;bytes] format
 pub fn serialize_to_bytes<S: Serializable>(obj: S) -> Vec<u8> {
-    let mut bytes = obj.serialize();
+    let bytes = obj.serialize();
     bytes.len().to_be_bytes()
         .to_vec()
         .into_iter()
