@@ -5,11 +5,17 @@ lazy_static! {
 }
 
 pub fn tokenize_and_clean(name: &str) -> Vec<&str> {
+    tokenize(name)
+        .into_iter()
+        .filter(|term| STOP_WORDS.contains(term))
+        .collect()
+}
+
+pub fn tokenize(name: &str) -> Vec<&str> {
     name.split(" ")
         .map(str::trim)
         .filter(|term| !term.is_empty())
         .flat_map(tokenize_camel_case)
-        .filter(|term| !STOP_WORDS.contains(term))
         .collect()
 }
 
