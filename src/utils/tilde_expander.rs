@@ -1,4 +1,4 @@
-extern crate shellexpand;
+use shellexpand;
 
 use std::path::PathBuf;
 

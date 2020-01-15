@@ -1,4 +1,4 @@
-extern crate yaml_rust;
+use yaml_rust;
 
 use std::collections::HashSet as Set;
 use std::io;
