@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::path::PathBuf;
 use std::string::FromUtf8Error;
+
+use async_std::path::PathBuf;
 
 use crate::query::matcher;
 use crate::utils::serde::deserializer::Deserializable;
@@ -30,11 +31,7 @@ impl Serializable for Service {
     fn serialize(&self) -> Vec<u8> {
         let name = self.path.file_stem()
             .and_then(OsStr::to_str)
-            .map(matcher::tokenize)
-            .unwrap_or_default()
-            .into_iter()
-            .map(Self::map_term)
-            .collect::<Vec<&str>>().join(" ");
+            .unwrap_or_default();
         let name = serialize_to_bytes(&name[..]);
         let content = serialize_to_bytes(
             self.path.to_str().expect("Path cannot be stringified")
@@ -64,7 +61,7 @@ impl Deserializable for Service {
 
 #[cfg(test)]
 mod service_serde_test {
-    use std::path::PathBuf;
+    use async_std::path::PathBuf;
 
     use crate::query::service::Service;
     use crate::utils::serde::deserializer::Deserializable;

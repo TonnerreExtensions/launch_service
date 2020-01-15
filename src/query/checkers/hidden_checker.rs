@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
-use std::path::Path;
+
+use async_std::path::Path;
 
 use crate::query::checkers::checker::Checker;
 
@@ -24,7 +25,7 @@ impl Checker for HiddenChecker {
 
 #[cfg(test)]
 mod hidden_checker_test {
-    use std::path::Path;
+    use async_std::path::Path;
 
     use crate::query::checkers::checker::Checker;
     use crate::query::checkers::hidden_checker::HiddenChecker;

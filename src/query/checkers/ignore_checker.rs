@@ -1,5 +1,6 @@
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+
+use async_std::path::{Path, PathBuf};
 
 use crate::query::checkers::Checker;
 
@@ -23,7 +24,8 @@ impl Checker for IgnoreChecker {
 #[cfg(test)]
 mod ignore_checker_test {
     use std::collections::HashSet;
-    use std::path::{Path, PathBuf};
+
+    use async_std::path::{Path, PathBuf};
 
     use crate::query::checkers::{Checker, IgnoreChecker};
 

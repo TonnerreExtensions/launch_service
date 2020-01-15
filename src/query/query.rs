@@ -1,5 +1,12 @@
-use std::fs::read_dir;
-use std::path::{Path, PathBuf};
+use std::collections::VecDeque;
+
+use async_std::fs::read_dir;
+use async_std::path::{Path, PathBuf};
+use async_std::prelude::*;
+use async_std::stream;
+use futures::executor::block_on;
+use futures::join;
+use futures::StreamExt;
 
 use crate::configurator::Configs;
 use crate::query::checkers::{BundleChecker, Checker, HiddenChecker, IgnoreChecker};
@@ -36,60 +43,91 @@ impl QueryProcessor {
     }
 
     pub fn query(&self, req: String) -> Vec<u8> {
-        let cached_services = self.query_cached_services(&req);
-        let updated_services = self.query_updated_services(&req);
+        block_on(self.async_query(req))
+    }
+
+    async fn async_query(&self, req: String) -> Vec<u8> {
+        let (cached_services, updated_services) = join!(self.query_cached_services(&req), self.query_updated_services(&req));
         cached_services.into_iter()
             .chain(updated_services.into_iter())
             .collect()
     }
 
-    fn query_cached_services(&self, req: &str) -> Vec<u8> {
+    async fn query_cached_services(&self, req: &str) -> Vec<u8> {
         let cache_manager = CacheManager::new();
         match Some(cache_manager.bunch_read_bytes()) {
             Some(cache) if !cache.is_empty() => cache,
-            _ => cache_manager.save_bytes(
-                self.config.get_internal_cached()
-                    .into_iter()
-                    .flat_map(|path| self.walk_dir(path))
-                    .filter(|path| path.to_str().is_some())
-                    .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
-                    .map(Service::new)
-                    .flat_map(serializer::serialize_to_bytes)
-                    .collect()
+            _ => {
+                let mut res: Vec<u8> = vec![];
+                while let Some(path) = self.config.get_internal_cached().into_iter().next() {
+                    res.extend(self.walk_dir(path).await
+                        .into_iter()
+                        .filter(|path| path.to_str().is_some())
+                        .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
+                        .map(Service::new)
+                        .flat_map(serializer::serialize_to_bytes)
+                        .collect::<Vec<_>>()
+                    )
+                }
+                cache_manager.save_bytes(res)
+            }
+        }
+    }
+
+    async fn query_updated_services(&self, req: &str) -> Vec<u8> {
+        let mut res = vec![];
+        while let Some(path) = self.config.get_internal_updated().into_iter().next() {
+            res.extend(self.walk_dir(path).await
+                .into_iter()
+                .filter(|path| path.to_str().is_some())
+                .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
+                .map(Service::new)
+                .flat_map(serializer::serialize_to_bytes)
+                .collect::<Vec<_>>()
             )
+        };
+        res
+    }
+
+    async fn walk_dir(&self, entry: PathBuf) -> Vec<PathBuf> {
+        if self.terminate_checkers.iter()
+            .any(|checker| checker.is_legit(&entry)) {
+            vec![]
+        } else if self.condition_checker.is_legit(&entry) {
+            vec![entry]
+        } else {
+            let (mut res, mut remaining) = self.iterate_dir(entry).await;
+            while let Some(entry) = remaining.pop_front() {
+                let (processed, unprocessed) = self.iterate_dir(entry).await;
+                res.extend(processed);
+                remaining.extend(unprocessed);
+            }
+            res
         }
     }
 
-    fn query_updated_services(&self, req: &str) -> Vec<u8> {
-        self.config.get_internal_updated()
-            .into_iter()
-            .flat_map(|path| self.walk_dir(path))
-            .filter(|path| path.to_str().is_some())
-            .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
-            .map(Service::new)
-            .flat_map(serializer::serialize_to_bytes)
-            .collect()
-    }
-
-    fn walk_dir(&self, entry: PathBuf) -> Vec<PathBuf> {
-        let terminate_condition = self.terminate_checkers.iter()
-            .any(|checker| checker.is_legit(&entry));
-        let eligible_condition = self.condition_checker.is_legit(&entry);
-        match (read_dir(&entry), eligible_condition, terminate_condition) {
-            (Ok(files), false, false) => files.filter_map(Result::ok)
-                .map(|entry| entry.path())
-                .flat_map(|entry| self.walk_dir(entry))
-                .collect(),
-            (_, true, false) => vec![entry],
-            _ => vec![]
+    async fn iterate_dir(&self, entry: PathBuf) -> (Vec<PathBuf>, VecDeque<PathBuf>) {
+        let mut processed = vec![];
+        let mut folders = VecDeque::<PathBuf>::new();
+        let mut read_folder = read_dir(&entry).await.expect("Unwrap folder");
+        while let Some(Ok(path)) = read_folder.next().await {
+            let path = path.path();
+            if self.terminate_checkers.iter().any(|checker| checker.is_legit(&path)) {
+                continue
+            } else if self.condition_checker.is_legit(&path) {
+                processed.push(path)
+            } else {
+                folders.push_back(path)
+            }
         }
+        (processed, folders)
     }
 }
 
-
 #[cfg(test)]
 mod query_test {
-    use std::path::PathBuf;
+    use async_std::path::PathBuf;
+    use futures::executor::block_on;
 
     use crate::query::query::QueryProcessor;
 
@@ -103,7 +141,7 @@ mod query_test {
         let processor = QP::new();
         let single_file = PathBuf::from(APP_PATH);
         let expected = PathBuf::from(APP_PATH);
-        let res = processor.walk_dir(single_file);
+        let res = block_on(processor.walk_dir(single_file));
         assert_eq!(&expected, &res[0]);
     }
 
@@ -111,7 +149,7 @@ mod query_test {
     fn test_walk_dir_inside_book() {
         let processor = QP::new();
         let content = PathBuf::from(APP_FOLDER_PATH);
-        let res = processor.walk_dir(content);
+        let res = block_on(processor.walk_dir(content));
         assert_eq!(52, res.len());
     }
 }

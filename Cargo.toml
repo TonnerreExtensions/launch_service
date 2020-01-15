@@ -11,4 +11,7 @@ lazy_static = "1.4.0"
 yaml-rust = "0.4.3"
 shellexpand = "1.1.1"
 futures = "0.3.1"
-async-std = "1.4.0"
+
+[dependencies.async-std]
+version = "1.4.0"
+features = ["unstable"]
