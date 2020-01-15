@@ -5,8 +5,12 @@ pub fn match_query(query: &str, target: &str) -> bool {
 }
 
 /// Simple match that query is the prefix of target
+/// Example: `Activity Manager` matches `act` or `ma`
 fn prefix_match(query: &str, target: &str) -> bool {
-    target.to_lowercase().starts_with(query)
+    target.to_lowercase().starts_with(query) ||
+        tokenize_and_clean(target).into_iter()
+            .map(str::to_lowercase)
+            .any(|component| component.starts_with(query))
 }
 
 /// Complex match that query contains prefixes of target components

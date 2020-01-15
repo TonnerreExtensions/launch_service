@@ -1,14 +1,14 @@
 use std::collections::HashSet as Set;
 use std::io;
 use std::io::ErrorKind;
+use std::path::Path;
 
-use async_std::path::{Path, PathBuf};
+use async_std::path::PathBuf;
 use yaml_rust;
 use yaml_rust::yaml::Yaml;
+use yaml_rust::YamlLoader;
 
 use crate::utils;
-
-use self::yaml_rust::YamlLoader;
 
 /// Configs that are loaded from a yaml file
 #[derive(Debug)]
@@ -67,7 +67,7 @@ impl Configs {
 
 #[cfg(test)]
 mod configs_test {
-    use async_std::path::Path;
+    use std::path::Path;
 
     use crate::configurator::configs::Configs;
 

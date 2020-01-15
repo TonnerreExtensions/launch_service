@@ -4,7 +4,6 @@ use std::string::FromUtf8Error;
 
 use async_std::path::PathBuf;
 
-use crate::query::matcher;
 use crate::utils::serde::deserializer::Deserializable;
 use crate::utils::serde::serializer::{Serializable, serialize_to_bytes};
 
@@ -14,7 +13,7 @@ lazy_static! {
 }
 
 pub struct Service {
-    path: PathBuf
+    pub path: PathBuf
 }
 
 impl Service {

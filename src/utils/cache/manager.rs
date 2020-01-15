@@ -1,3 +1,6 @@
+use crate::utils::serde::deserializer::Deserializable;
+use crate::utils::serde::serializer::Serializable;
+
 pub struct CacheManager;
 
 impl CacheManager {
@@ -6,15 +9,19 @@ impl CacheManager {
     }
 
     /// TODO: Read cache
-    pub fn read_bytes(&self) -> Option<u8> {
+    pub fn read<S: Deserializable>(&self) -> Option<S> {
         None
     }
 
-    pub fn bunch_read_bytes(&self) -> Vec<u8> {
+    pub fn bunch_read<S: Deserializable>(&self) -> Vec<S> {
         vec![]
     }
 
-    pub fn save_bytes(&self, bytes: Vec<u8>) -> Vec<u8> {
-        bytes
+    pub fn save<S: Serializable>(&self, data: S) -> S {
+        data
+    }
+
+    pub fn bunch_save<S: Serializable>(&self, data: Vec<S>) -> Vec<S> {
+        data.into_iter().map(|datum| self.save(datum)).collect()
     }
 }

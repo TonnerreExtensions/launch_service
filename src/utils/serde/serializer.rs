@@ -2,7 +2,7 @@ pub trait Serializable {
     fn serialize(&self) -> Vec<u8>;
 }
 
-/// Serialize object to [size;type;bytes] format
+/// Serialize object to [size;bytes] format
 pub fn serialize_to_bytes<S: Serializable>(obj: S) -> Vec<u8> {
     let bytes = obj.serialize();
     bytes.len().to_be_bytes()
