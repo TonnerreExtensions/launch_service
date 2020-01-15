@@ -14,12 +14,6 @@ lazy_static! {
 /// Checker that checks if a file path is a bundle by inspecting its extensions
 pub struct BundleChecker;
 
-impl BundleChecker {
-    pub fn new() -> Self {
-        BundleChecker {}
-    }
-}
-
 impl Checker for BundleChecker {
     fn is_legit(&self, path: &Path) -> bool {
         path.extension()
@@ -37,21 +31,21 @@ mod bundle_checker_test {
 
     #[test]
     fn test_is_bundle_app() {
-        assert!(BundleChecker::new().is_legit(Path::new("/System/Applications/Books.app")));
+        assert!(BundleChecker {}.is_legit(Path::new("/System/Applications/Books.app")));
     }
 
     #[test]
     fn test_is_bundle_pref() {
-        assert!(BundleChecker::new().is_legit(Path::new("/System/Library/PreferencePanes/Network.prefPane")));
+        assert!(BundleChecker {}.is_legit(Path::new("/System/Library/PreferencePanes/Network.prefPane")));
     }
 
     #[test]
     fn test_is_bundle_folder() {
-        assert_eq!(BundleChecker::new().is_legit(Path::new("/Applications")), false);
+        assert_eq!(BundleChecker {}.is_legit(Path::new("/Applications")), false);
     }
 
     #[test]
     fn test_is_bundle_file() {
-        assert_eq!(BundleChecker::new().is_legit(Path::new("/dev/null")), false);
+        assert_eq!(BundleChecker {}.is_legit(Path::new("/dev/null")), false);
     }
 }

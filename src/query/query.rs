@@ -8,7 +8,7 @@ use futures::join;
 use futures::StreamExt;
 
 use crate::configurator::Configs;
-use crate::query::checkers::{BundleChecker, Checker, HiddenChecker, IgnoreChecker};
+use crate::query::checkers::{BundleChecker, Checker, HiddenChecker, IgnoreChecker, SymlinkChecker};
 use crate::query::matcher;
 use crate::query::service::Service;
 use crate::utils::cache::CacheManager;
@@ -30,13 +30,14 @@ impl QueryProcessor {
         let ignore_paths = config.get_ignore_paths();
         QueryProcessor {
             config,
-            condition_checker: Box::new(BundleChecker::new()),
+            condition_checker: Box::new(BundleChecker {}),
             terminate_checkers: if ignore_paths.is_empty() {
-                vec![Box::new(HiddenChecker::new())]
+                vec![Box::new(HiddenChecker {})]
             } else {
                 vec![
-                    Box::new(HiddenChecker::new()),
-                    Box::new(IgnoreChecker::new(ignore_paths))
+                    Box::new(HiddenChecker {}),
+                    Box::new(IgnoreChecker::new(ignore_paths)),
+                    Box::new(SymlinkChecker {})
                 ]
             },
         }
@@ -49,7 +50,10 @@ impl QueryProcessor {
 
     /// Async query
     async fn async_query(&self, req: String) -> Vec<u8> {
-        let (cached_services, updated_services) = join!(self.query_cached_services(&req), self.query_updated_services(&req));
+        let (cached_services, updated_services) = join!(
+            self.query_cached_services(&req),
+            self.query_updated_services(&req)
+        );
         cached_services.into_iter()
             .chain(updated_services.into_iter())
             .collect()
