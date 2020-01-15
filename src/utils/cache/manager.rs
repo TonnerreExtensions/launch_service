@@ -9,19 +9,23 @@ impl CacheManager {
     }
 
     /// TODO: Read cache
-    pub fn read<S: Deserializable>(&self) -> Option<S> {
+    pub async fn read<S: Deserializable>(&self) -> Option<S> {
         None
     }
 
-    pub fn bunch_read<S: Deserializable>(&self) -> Vec<S> {
+    pub async fn bunch_read<S: Deserializable>(&self) -> Vec<S> {
         vec![]
     }
 
-    pub fn save<S: Serializable>(&self, data: S) -> S {
+    pub async fn save<S: Serializable>(&self, data: S) -> S {
         data
     }
 
-    pub fn bunch_save<S: Serializable>(&self, data: Vec<S>) -> Vec<S> {
-        data.into_iter().map(|datum| self.save(datum)).collect()
+    pub async fn bunch_save<S: Serializable>(&self, data: Vec<S>) -> Vec<S> {
+        let mut res = vec![];
+        for datum in data {
+            res.push(self.save(datum).await);
+        }
+        res
     }
 }
