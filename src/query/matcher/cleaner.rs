@@ -7,7 +7,7 @@ lazy_static! {
 pub fn tokenize_and_clean(name: &str) -> Vec<&str> {
     tokenize(name)
         .into_iter()
-        .filter(|term| STOP_WORDS.contains(term))
+        .filter(|term| !STOP_WORDS.contains(term))
         .collect()
 }
 

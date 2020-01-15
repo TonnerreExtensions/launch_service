@@ -39,8 +39,8 @@ impl Serializable for Service {
         let content = serialize_to_bytes(
             self.path.to_str().expect("Path cannot be stringified")
         );
-        name.into_iter()
-            .chain(content.clone().into_iter())
+        content.clone().into_iter()
+            .chain(name.into_iter())
             .chain(content.into_iter())
             .collect()
     }
@@ -54,7 +54,11 @@ impl Serializable for &str {
 
 impl Deserializable for Service {
     fn deserialize(bytes: Vec<u8>) -> Result<Self, FromUtf8Error> where Self: std::marker::Sized {
-        unimplemented!()
+        Ok(
+            Service::new(
+                PathBuf::from(String::from_utf8(bytes)?)
+            )
+        )
     }
 }
 
@@ -63,6 +67,7 @@ mod service_serde_test {
     use std::path::PathBuf;
 
     use crate::query::service::Service;
+    use crate::utils::serde::deserializer::Deserializable;
     use crate::utils::serde::serializer::serialize_to_bytes;
 
     #[test]
@@ -78,8 +83,8 @@ mod service_serde_test {
 
         let name = serialize_to_bytes("Books");
         let content = serialize_to_bytes(path);
-        let chained: Vec<u8> = name.into_iter()
-            .chain(content.clone().into_iter())
+        let chained: Vec<u8> = content.clone().into_iter()
+            .chain(name.into_iter())
             .chain(content.into_iter())
             .collect();
         let expected: Vec<u8> = chained.len().to_be_bytes()
@@ -88,5 +93,13 @@ mod service_serde_test {
             .collect();
 
         assert_eq!(bytes, expected);
+    }
+
+    #[test]
+    fn test_deserialize() {
+        let path = "/System/Applications/Books.app";
+        let service = Service::deserialize(path.as_bytes().to_vec()).unwrap();
+
+        assert_eq!(service.path, PathBuf::from(path))
     }
 }
