@@ -1,5 +1,3 @@
-use std::fs::{FileType, Metadata};
-
 use async_std::path::Path;
 use futures::executor::block_on;
 
