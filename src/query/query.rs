@@ -4,6 +4,7 @@ use std::path::Path;
 use async_std::fs::read_dir;
 use async_std::path::PathBuf;
 use futures::executor::block_on;
+use futures::future::join_all;
 use futures::join;
 use futures::StreamExt;
 
@@ -64,17 +65,16 @@ impl QueryProcessor {
         let mut cache_manager = CacheManager::new().await;
         match Some(cache_manager.bunch_read().await) {
             Some(cache) if !cache.is_empty() => cache,
-            _ => {
-                let mut res: Vec<Service> = vec![];
-                for path in self.config.get_internal_cached() {
-                    let paths = self.recursively_iterate(path).await
-                        .into_iter()
-                        .map(Service::new)
-                        .collect::<Vec<_>>();
-                    res.extend(paths);
-                }
-                cache_manager.bunch_save(res).await
-            }
+            _ => cache_manager.bunch_save(
+                join_all(self.config.get_internal_cached()
+                    .into_iter()
+                    .map(|path| self.recursively_iterate(path))
+                ).await
+                    .into_iter()
+                    .flatten()
+                    .map(Service::new)
+                    .collect()
+            ).await
         }.into_iter()
             .filter(|service| service.path.to_str().is_some())
             .filter(|service| matcher::match_query(&req, service.path.to_str().unwrap()))
@@ -83,18 +83,17 @@ impl QueryProcessor {
     }
 
     async fn query_updated_services(&self, req: &str) -> Vec<u8> {
-        let mut res = vec![];
-        for path in self.config.get_internal_updated() {
-            let bytes = self.recursively_iterate(path).await
-                .into_iter()
-                .filter(|path| path.to_str().is_some())
-                .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
-                .map(Service::new)
-                .flat_map(serializer::serialize_to_bytes)
-                .collect::<Vec<_>>();
-            res.extend(bytes)
-        }
-        res
+        join_all(self.config.get_internal_updated()
+            .into_iter()
+            .map(|path| self.recursively_iterate(path))
+        ).await
+            .into_iter()
+            .flatten()
+            .filter(|path| path.to_str().is_some())
+            .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
+            .map(Service::new)
+            .flat_map(serializer::serialize_to_bytes)
+            .collect()
     }
 
     /// Recursively iterate through files and folders, and return all legit file paths
