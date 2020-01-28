@@ -1,13 +1,42 @@
-use std::string::FromUtf8Error;
+pub use error::DeserializableError;
+
+mod error {
+    use std::fmt::Formatter;
+    use std::string::FromUtf8Error;
+
+    #[derive(Debug)]
+    pub enum DeserializableError {
+        EmptyBytes,
+        UnableToDeserialize(FromUtf8Error),
+    }
+
+    impl From<FromUtf8Error> for DeserializableError {
+        fn from(err: FromUtf8Error) -> Self {
+            DeserializableError::UnableToDeserialize(err)
+        }
+    }
+
+    impl std::fmt::Display for DeserializableError {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "Failed to deserialize")
+        }
+    }
+
+    impl std::error::Error for DeserializableError {}
+}
 
 pub trait Deserializable {
-    fn deserialize(bytes: Vec<u8>) -> Result<Self, FromUtf8Error>
+    fn deserialize(bytes: Vec<u8>) -> Result<Self, DeserializableError>
         where Self: std::marker::Sized;
 }
 
-pub fn deserialize_from_bytes<D: Deserializable>(bytes: &mut Vec<u8>) -> Result<D, FromUtf8Error> {
-    let size = read_len(bytes) as usize;
-    D::deserialize(bytes.drain(..size).collect())
+pub fn deserialize_from_bytes<D: Deserializable>(bytes: &mut Vec<u8>) -> Result<D, DeserializableError> {
+    if bytes.is_empty() {
+        Err(DeserializableError::EmptyBytes)
+    } else {
+        let size = read_len(bytes) as usize;
+        D::deserialize(bytes.drain(..size).collect())
+    }
 }
 
 fn read_len(bytes: &mut Vec<u8>) -> u16 {
@@ -21,13 +50,11 @@ fn read_len(bytes: &mut Vec<u8>) -> u16 {
 
 #[cfg(test)]
 mod deserializer_test {
-    use std::string::FromUtf8Error;
-
-    use crate::utils::serde::deserializer::Deserializable;
+    use crate::utils::serde::deserializer::{Deserializable, DeserializableError};
 
     impl Deserializable for String {
-        fn deserialize(bytes: Vec<u8>) -> Result<Self, FromUtf8Error> where Self: std::marker::Sized {
-            String::from_utf8(bytes)
+        fn deserialize(bytes: Vec<u8>) -> Result<Self, DeserializableError> where Self: std::marker::Sized {
+            Ok(String::from_utf8(bytes)?)
         }
     }
 

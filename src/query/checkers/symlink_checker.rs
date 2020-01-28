@@ -1,5 +1,4 @@
 use async_std::path::Path;
-use futures::executor::block_on;
 
 use crate::query::checkers::Checker;
 

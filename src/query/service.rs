@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::string::FromUtf8Error;
 
 use async_std::path::PathBuf;
 
-use crate::utils::serde::deserializer::Deserializable;
+use crate::utils::serde::deserializer::{Deserializable, DeserializableError};
 use crate::utils::serde::serializer::{Serializable, serialize_to_bytes};
 
 lazy_static! {
@@ -49,7 +48,7 @@ impl Serializable for &str {
 }
 
 impl Deserializable for Service {
-    fn deserialize(bytes: Vec<u8>) -> Result<Self, FromUtf8Error> where Self: std::marker::Sized {
+    fn deserialize(bytes: Vec<u8>) -> Result<Self, DeserializableError> where Self: std::marker::Sized {
         Ok(
             Service::new(
                 PathBuf::from(String::from_utf8(bytes)?)

@@ -1,6 +1,6 @@
 use async_std::fs::File;
 use async_std::fs::OpenOptions;
-use async_std::prelude::*;
+use futures::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use futures::io::SeekFrom;
 
 use crate::utils::serde::deserializer::{Deserializable, deserialize_from_bytes};
@@ -19,7 +19,7 @@ impl CacheManager {
             Ok(path) if !path.is_empty() => OpenOptions::new()
                 .create(true)
                 .read(true)
-                .append(true)
+                .write(true)
                 .open(path).await
                 .ok(),
             _ => None
@@ -44,14 +44,21 @@ impl CacheManager {
         res
     }
 
-    async fn save<S: Serializable>(&mut self, data: S) -> S {
+    async fn save<S: Serializable>(&mut self, datum: S) -> S {
         match &mut self.cache_file {
             Some(file) => {
-                file.write_all(&data.serialize()).await;
+                let bytes = datum.serialize();
+                file.write_all(
+                    &(bytes.len() as u16).to_be_bytes()
+                        .to_vec()
+                        .into_iter()
+                        .chain(bytes.into_iter())
+                        .collect::<Vec<_>>()
+                ).await;
             }
             _ => ()
         }
-        data
+        datum
     }
 
     pub async fn bunch_save<S: Serializable>(&mut self, data: Vec<S>) -> Vec<S> {
@@ -63,5 +70,54 @@ impl CacheManager {
             res.push(self.save(datum).await);
         }
         res
+    }
+}
+
+#[cfg(test)]
+mod cache_manager_test {
+    use futures::executor::block_on;
+
+    use crate::utils::cache::CacheManager;
+
+    const CACHE_FILE_PATH: &'static str = "/tmp/cacheManagerTestCacheFile";
+
+    fn construct_manager() -> CacheManager {
+        std::env::set_var(CacheManager::PATH_KEY, CACHE_FILE_PATH);
+        block_on(CacheManager::new())
+    }
+
+    fn remove_cache_file() {
+        std::fs::remove_file(CACHE_FILE_PATH);
+    }
+
+    #[test]
+    fn test_bunch_save() {
+        let expected: Vec<String> = vec!["Hello".into(), "World".into()];
+        let mut manager = construct_manager();
+        let res = block_on(manager.bunch_save(expected.clone()));
+        remove_cache_file();
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn test_bunch_read_after_save() {
+        let expected: Vec<String> = vec!["Hello".into(), "World".into()];
+        let mut manager = construct_manager();
+        block_on(manager.bunch_save(expected.clone()));
+        let read_values: Vec<String> = block_on(manager.bunch_read());
+        remove_cache_file();
+        assert_eq!(read_values, expected);
+    }
+
+    #[test]
+    fn test_multiple_save() {
+        let expected: Vec<String> = vec!["Hello".into(), "World".into()];
+        let mut manager = construct_manager();
+        for _ in 0..5 {
+            block_on(manager.bunch_save(expected.clone()));
+        }
+        let read_values: Vec<String> = block_on(manager.bunch_read());
+        remove_cache_file();
+        assert_eq!(read_values, expected);
     }
 }
