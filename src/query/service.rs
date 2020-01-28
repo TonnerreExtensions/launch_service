@@ -83,7 +83,7 @@ mod service_serde_test {
             .chain(name.into_iter())
             .chain(content.into_iter())
             .collect();
-        let expected: Vec<u8> = chained.len().to_be_bytes()
+        let expected: Vec<u8> = (chained.len() as u16).to_be_bytes()
             .to_vec().into_iter()
             .chain(chained.into_iter())
             .collect();

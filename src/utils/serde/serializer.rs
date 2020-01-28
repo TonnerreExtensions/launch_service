@@ -5,7 +5,7 @@ pub trait Serializable {
 /// Serialize object to [size;bytes] format
 pub fn serialize_to_bytes<S: Serializable>(obj: S) -> Vec<u8> {
     let bytes = obj.serialize();
-    bytes.len().to_be_bytes()
+    (bytes.len() as u16).to_be_bytes()
         .to_vec()
         .into_iter()
         .chain(bytes.into_iter())
@@ -26,6 +26,6 @@ mod serialize_test {
     fn test_serialize_string() {
         let test = "Hello".to_owned();
         let serialized = serialize_to_bytes(test);
-        assert_eq!(serialized, vec![0, 0, 0, 0, 0, 0, 0, 5, 72, 101, 108, 108, 111]);
+        assert_eq!(serialized, vec![0, 5, 72, 101, 108, 108, 111]);
     }
 }

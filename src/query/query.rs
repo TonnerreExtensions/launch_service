@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::path::Path;
 
 use async_std::fs::read_dir;
@@ -21,6 +21,17 @@ pub struct QueryProcessor {
     terminate_checkers: Vec<Box<dyn Checker>>,
 }
 
+fn construct_terminate_checkers(ignore_paths: HashSet<PathBuf>) -> Vec<Box<dyn Checker>> {
+    let mut checkers: Vec<Box<dyn Checker>> = vec![
+        Box::new(HiddenChecker {}),
+        Box::new(SymlinkChecker {})
+    ];
+    if !ignore_paths.is_empty() {
+        checkers.push(Box::new(IgnoreChecker::new(ignore_paths)));
+    }
+    checkers
+}
+
 impl QueryProcessor {
     const CONFIG_PATH: &'static str = "settings.yaml";
 
@@ -32,15 +43,7 @@ impl QueryProcessor {
         QueryProcessor {
             config,
             condition_checker: Box::new(BundleChecker {}),
-            terminate_checkers: if ignore_paths.is_empty() {
-                vec![Box::new(HiddenChecker {})]
-            } else {
-                vec![
-                    Box::new(HiddenChecker {}),
-                    Box::new(IgnoreChecker::new(ignore_paths)),
-                    Box::new(SymlinkChecker {})
-                ]
-            },
+            terminate_checkers: construct_terminate_checkers(ignore_paths),
         }
     }
 

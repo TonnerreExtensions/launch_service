@@ -7,7 +7,8 @@ pub struct SymlinkChecker;
 
 impl Checker for SymlinkChecker {
     fn is_legit(&self, path: &Path) -> bool {
-        block_on(path.symlink_metadata())
+        let path: &std::path::Path = path.into();
+        path.symlink_metadata()
             .map(|metadata| metadata.file_type())
             .map(|file_type| file_type.is_symlink())
             .unwrap_or(false)

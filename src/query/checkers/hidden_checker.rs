@@ -12,7 +12,7 @@ impl Checker for HiddenChecker {
         path.to_str().map(str::len).unwrap_or(0) <= 1 ||
             path.file_stem()
                 .and_then(OsStr::to_str)
-                .and_then(|name| Some(name.starts_with(".")))
+                .map(|name| name.starts_with("."))
                 .unwrap_or(false)
     }
 }
