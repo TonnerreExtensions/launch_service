@@ -30,10 +30,11 @@ impl CacheManager {
     pub async fn bunch_read<S: Deserializable>(&mut self) -> Vec<S> {
         let mut bytes = match &mut self.cache_file {
             Some(file) => {
-                file.seek(SeekFrom::Start(0)).await.expect("Unable to start from beginning");
-                let mut bytes: Vec<u8> = vec![];
-                file.read_to_end(&mut bytes).await.expect("Unable to read file");
-                bytes
+                if let Ok(_) = file.seek(SeekFrom::Start(0)).await {
+                    let mut bytes: Vec<u8> = vec![];
+                    let _ = file.read_to_end(&mut bytes).await;
+                    bytes
+                } else { vec![] }
             }
             _ => vec![]
         };
@@ -48,13 +49,13 @@ impl CacheManager {
         match &mut self.cache_file {
             Some(file) => {
                 let bytes = datum.serialize();
-                file.write_all(
+                let _ = file.write_all(
                     &(bytes.len() as u16).to_be_bytes()
                         .to_vec()
                         .into_iter()
                         .chain(bytes.into_iter())
                         .collect::<Vec<_>>()
-                ).await.expect("Unable to write");
+                ).await;
             }
             _ => ()
         }
