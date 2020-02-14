@@ -48,12 +48,12 @@ impl QueryProcessor {
     }
 
     /// Query based on the request, and return serialized bytes of the services
-    pub fn query(&self, req: String) -> Vec<u8> {
+    pub fn query(&self, req: &str) -> Vec<u8> {
         block_on(self.async_query(req))
     }
 
     /// Async query
-    async fn async_query(&self, req: String) -> Vec<u8> {
+    async fn async_query(&self, req: &str) -> Vec<u8> {
         let (cached_services, updated_services) = join!(
             self.query_cached_services(&req),
             self.query_updated_services(&req)

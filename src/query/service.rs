@@ -11,6 +11,10 @@ lazy_static! {
         .iter().cloned().collect();
 }
 
+fn map_term(name: &str) -> &str {
+    NAME_MAP.get(name).unwrap_or(&name)
+}
+
 pub struct Service {
     pub path: PathBuf
 }
@@ -19,16 +23,13 @@ impl Service {
     pub fn new(path: PathBuf) -> Self {
         Service { path }
     }
-
-    fn map_term(name: &str) -> &str {
-        NAME_MAP.get(name).unwrap_or(&name)
-    }
 }
 
 impl Serializable for Service {
     fn serialize(&self) -> Vec<u8> {
         let name = self.path.file_stem()
             .and_then(OsStr::to_str)
+            .map(map_term)
             .unwrap_or_default();
         let name = serialize_to_bytes(&name[..]);
         let content = serialize_to_bytes(
@@ -61,13 +62,13 @@ impl Deserializable for Service {
 mod service_serde_test {
     use async_std::path::PathBuf;
 
-    use crate::query::service::Service;
+    use crate::query::service::{map_term, Service};
     use crate::utils::serde::deserializer::Deserializable;
     use crate::utils::serde::serializer::serialize_to_bytes;
 
     #[test]
     fn test_map_term() {
-        assert_eq!(Service::map_term("And"), "&");
+        assert_eq!(map_term("And"), "&");
     }
 
     #[test]

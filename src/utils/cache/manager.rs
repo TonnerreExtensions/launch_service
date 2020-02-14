@@ -17,7 +17,7 @@ impl CacheManager {
         let path = std::env::var(Self::PATH_KEY);
         let cache_file = match path {
             Ok(path) if !path.is_empty() => OpenOptions::new()
-                .create(true)
+                .create(false)
                 .read(true)
                 .write(true)
                 .open(path).await
@@ -30,9 +30,9 @@ impl CacheManager {
     pub async fn bunch_read<S: Deserializable>(&mut self) -> Vec<S> {
         let mut bytes = match &mut self.cache_file {
             Some(file) => {
-                file.seek(SeekFrom::Start(0)).await;
+                file.seek(SeekFrom::Start(0)).await.expect("Unable to start from beginning");
                 let mut bytes: Vec<u8> = vec![];
-                file.read_to_end(&mut bytes).await;
+                file.read_to_end(&mut bytes).await.expect("Unable to read file");
                 bytes
             }
             _ => vec![]
@@ -54,7 +54,7 @@ impl CacheManager {
                         .into_iter()
                         .chain(bytes.into_iter())
                         .collect::<Vec<_>>()
-                ).await;
+                ).await.expect("Unable to write");
             }
             _ => ()
         }
@@ -63,7 +63,7 @@ impl CacheManager {
 
     pub async fn bunch_save<S: Serializable>(&mut self, data: Vec<S>) -> Vec<S> {
         if let Some(file) = &mut self.cache_file {
-            file.seek(SeekFrom::Start(0)).await;
+            file.seek(SeekFrom::Start(0)).await.expect("Unable to start from beginning");
         }
         let mut res = vec![];
         for datum in data {
@@ -87,7 +87,7 @@ mod cache_manager_test {
     }
 
     fn remove_cache_file() {
-        std::fs::remove_file(CACHE_FILE_PATH);
+        std::fs::remove_file(CACHE_FILE_PATH).expect("Unable to remove test file");
     }
 
     #[test]
