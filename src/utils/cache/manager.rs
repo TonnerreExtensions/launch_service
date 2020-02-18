@@ -76,6 +76,8 @@ impl CacheManager {
 
 #[cfg(test)]
 mod cache_manager_test {
+    use std::fs::File;
+
     use futures::executor::block_on;
 
     use crate::utils::cache::CacheManager;
@@ -83,6 +85,7 @@ mod cache_manager_test {
     const CACHE_FILE_PATH: &'static str = "/tmp/cacheManagerTestCacheFile";
 
     fn construct_manager() -> CacheManager {
+        File::create(CACHE_FILE_PATH).expect("Unable to create file");
         std::env::set_var(CacheManager::PATH_KEY, CACHE_FILE_PATH);
         block_on(CacheManager::new())
     }

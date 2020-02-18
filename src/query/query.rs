@@ -1,15 +1,14 @@
-use std::collections::{HashSet, VecDeque};
-use std::path::Path;
+use std::collections::VecDeque;
 
 use async_std::fs::read_dir;
-use async_std::path::PathBuf;
+use async_std::path::{Path, PathBuf};
 use futures::executor::block_on;
 use futures::future::join_all;
 use futures::join;
 use futures::StreamExt;
 
 use crate::configurator::Configs;
-use crate::query::checkers::{BundleChecker, Checker, HiddenChecker, IgnoreChecker, SymlinkChecker};
+use crate::query::checker::{self, Checker};
 use crate::query::matcher;
 use crate::query::service::Service;
 use crate::utils::cache::CacheManager;
@@ -17,19 +16,7 @@ use crate::utils::serde::serializer;
 
 pub struct QueryProcessor {
     config: Configs,
-    condition_checker: Box<dyn Checker>,
-    terminate_checkers: Vec<Box<dyn Checker>>,
-}
-
-fn construct_terminate_checkers(ignore_paths: HashSet<PathBuf>) -> Vec<Box<dyn Checker>> {
-    let mut checkers: Vec<Box<dyn Checker>> = vec![
-        Box::new(HiddenChecker {}),
-        Box::new(SymlinkChecker {})
-    ];
-    if !ignore_paths.is_empty() {
-        checkers.push(Box::new(IgnoreChecker::new(ignore_paths)));
-    }
-    checkers
+    checker: Checker,
 }
 
 impl QueryProcessor {
@@ -37,13 +24,12 @@ impl QueryProcessor {
 
     /// New query processor
     pub fn new() -> Self {
-        let config = Configs::from(Path::new(Self::CONFIG_PATH))
+        let config = Configs::from(Path::new(Self::CONFIG_PATH).into())
             .expect("settings.yaml is missing");
-        let ignore_paths = config.get_ignore_paths();
+        let ignored_paths = config.get_ignore_paths();
         QueryProcessor {
             config,
-            condition_checker: Box::new(BundleChecker {}),
-            terminate_checkers: construct_terminate_checkers(ignore_paths),
+            checker: Checker::new(ignored_paths),
         }
     }
 
@@ -101,19 +87,18 @@ impl QueryProcessor {
 
     /// Recursively iterate through files and folders, and return all legit file paths
     async fn recursively_iterate(&self, entry: PathBuf) -> Vec<PathBuf> {
-        if self.terminate_checkers.iter()
-            .any(|checker| checker.is_legit(&entry)) {
-            vec![]
-        } else if self.condition_checker.is_legit(&entry) {
-            vec![entry]
-        } else {
-            let (mut res, mut remaining) = self.separate_files_and_dirs(entry).await;
-            while let Some(entry) = remaining.pop_front() {
-                let (processed, unprocessed) = self.separate_files_and_dirs(entry).await;
-                res.extend(processed);
-                remaining.extend(unprocessed);
+        match self.checker.check(&entry) {
+            checker::Outcome::UnwantedPath => vec![],
+            checker::Outcome::BundlePath => vec![entry],
+            checker::Outcome::NormalPath => {
+                let (mut res, mut remaining) = self.separate_files_and_dirs(entry).await;
+                while let Some(entry) = remaining.pop_front() {
+                    let (processed, unprocessed) = self.separate_files_and_dirs(entry).await;
+                    res.extend(processed);
+                    remaining.extend(unprocessed);
+                }
+                res
             }
-            res
         }
     }
 
@@ -124,12 +109,10 @@ impl QueryProcessor {
         let mut read_folder = read_dir(&entry).await.expect("Unwrap folder");
         while let Some(Ok(path)) = read_folder.next().await {
             let path = path.path();
-            if self.terminate_checkers.iter().any(|checker| checker.is_legit(&path)) {
-                continue;
-            } else if self.condition_checker.is_legit(&path) {
-                processed.push(path)
-            } else {
-                folders.push_back(path)
+            match self.checker.check(&path) {
+                checker::Outcome::UnwantedPath => continue,
+                checker::Outcome::BundlePath => processed.push(path),
+                checker::Outcome::NormalPath => folders.push_back(path)
             }
         }
         (processed, folders)
