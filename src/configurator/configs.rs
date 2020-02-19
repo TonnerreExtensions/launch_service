@@ -61,6 +61,7 @@ impl Configs {
     fn convert_and_box(data: &Vec<Yaml>) -> Set<PathBuf> {
         data.iter().filter_map(Yaml::as_str)
             .map(utils::expand_tilde)
+            .map(PathBuf::from)
             .collect()
     }
 }

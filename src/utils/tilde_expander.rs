@@ -1,4 +1,5 @@
-use async_std::path::PathBuf;
+use std::path::PathBuf;
+
 use shellexpand;
 
 pub fn expand_tilde(path: &str) -> PathBuf {
@@ -7,7 +8,7 @@ pub fn expand_tilde(path: &str) -> PathBuf {
 
 #[cfg(test)]
 mod utils_test {
-    use async_std::path::PathBuf;
+    use std::path::PathBuf;
 
     use crate::utils::tilde_expander::expand_tilde;
 

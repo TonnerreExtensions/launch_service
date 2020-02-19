@@ -8,7 +8,7 @@ use futures::join;
 use futures::StreamExt;
 
 use crate::configurator::Configs;
-use crate::query::checker::{self, Checker};
+use crate::query::checker::{Checker, Outcome};
 use crate::query::matcher;
 use crate::query::service::Service;
 use crate::utils::cache::CacheManager;
@@ -57,7 +57,7 @@ impl QueryProcessor {
             _ => cache_manager.bunch_save(
                 join_all(self.config.get_internal_cached()
                     .into_iter()
-                    .map(|path| self.recursively_iterate(path))
+                    .map(|path| self.walk_paths(path))
                 ).await
                     .into_iter()
                     .flatten()
@@ -74,7 +74,7 @@ impl QueryProcessor {
     async fn query_updated_services(&self, req: &str) -> Vec<u8> {
         join_all(self.config.get_internal_updated()
             .into_iter()
-            .map(|path| self.recursively_iterate(path))
+            .map(|path| self.walk_paths(path))
         ).await
             .into_iter()
             .flatten()
@@ -86,11 +86,11 @@ impl QueryProcessor {
     }
 
     /// Recursively iterate through files and folders, and return all legit file paths
-    async fn recursively_iterate(&self, entry: PathBuf) -> Vec<PathBuf> {
+    async fn walk_paths(&self, entry: PathBuf) -> Vec<PathBuf> {
         match self.checker.check(&entry) {
-            checker::Outcome::UnwantedPath => vec![],
-            checker::Outcome::BundlePath => vec![entry],
-            checker::Outcome::NormalPath => {
+            Outcome::UnwantedPath => vec![],
+            Outcome::BundlePath => vec![entry],
+            Outcome::NormalPath => {
                 let (mut res, mut remaining) = self.separate_files_and_dirs(entry).await;
                 while let Some(entry) = remaining.pop_front() {
                     let (processed, unprocessed) = self.separate_files_and_dirs(entry).await;
@@ -110,9 +110,9 @@ impl QueryProcessor {
         while let Some(Ok(path)) = read_folder.next().await {
             let path = path.path();
             match self.checker.check(&path) {
-                checker::Outcome::UnwantedPath => continue,
-                checker::Outcome::BundlePath => processed.push(path),
-                checker::Outcome::NormalPath => folders.push_back(path)
+                Outcome::UnwantedPath => continue,
+                Outcome::BundlePath => processed.push(path),
+                Outcome::NormalPath => folders.push_back(path)
             }
         }
         (processed, folders)
@@ -136,7 +136,7 @@ mod query_test {
         let processor = QP::new();
         let single_file = PathBuf::from(APP_PATH);
         let expected = PathBuf::from(APP_PATH);
-        let res = block_on(processor.recursively_iterate(single_file));
+        let res = block_on(processor.walk_paths(single_file));
         assert_eq!(&expected, &res[0]);
     }
 
@@ -144,7 +144,7 @@ mod query_test {
     fn test_walk_dir_inside_book() {
         let processor = QP::new();
         let content = PathBuf::from(APP_FOLDER_PATH);
-        let res = block_on(processor.recursively_iterate(content));
+        let res = block_on(processor.walk_paths(content));
         assert_eq!(52, res.len());
     }
 }

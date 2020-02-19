@@ -20,10 +20,10 @@ impl Checker {
         Checker { ignored_paths, bundle_extensions }
     }
 
-    pub fn check(&self, path: &Path) -> Outcome {
-        if self.is_symlink(&path) || self.is_hidden(&path) || self.is_ignored_path(&path) {
+    pub fn check<P: AsRef<Path>>(&self, path: P) -> Outcome {
+        if self.is_symlink(path.as_ref()) || self.is_hidden(path.as_ref()) || self.is_ignored_path(path.as_ref()) {
             Outcome::UnwantedPath
-        } else if self.is_bundle(&path) {
+        } else if self.is_bundle(path.as_ref()) {
             Outcome::BundlePath
         } else {
             Outcome::NormalPath

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
-
-use async_std::path::PathBuf;
+use std::path::PathBuf;
 
 use crate::utils::serde::deserializer::{Deserializable, DeserializableError};
 use crate::utils::serde::serializer::{Serializable, serialize_to_bytes};
@@ -20,8 +19,8 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn new(path: PathBuf) -> Self {
-        Service { path }
+    pub fn new<P: Into<PathBuf>>(path: P) -> Self {
+        Service { path: path.into() }
     }
 }
 
@@ -60,7 +59,7 @@ impl Deserializable for Service {
 
 #[cfg(test)]
 mod service_serde_test {
-    use async_std::path::PathBuf;
+    use std::path::PathBuf;
 
     use crate::query::service::{map_term, Service};
     use crate::utils::serde::deserializer::Deserializable;

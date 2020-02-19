@@ -84,44 +84,49 @@ mod cache_manager_test {
 
     const CACHE_FILE_PATH: &'static str = "/tmp/cacheManagerTestCacheFile";
 
-    fn construct_manager() -> CacheManager {
-        File::create(CACHE_FILE_PATH).expect("Unable to create file");
-        std::env::set_var(CacheManager::PATH_KEY, CACHE_FILE_PATH);
+    fn construct_manager(file_name: &str) -> CacheManager {
+        let file_name = format!("{}{}", CACHE_FILE_PATH, file_name);
+        File::create(&file_name).expect("Unable to create file");
+        std::env::set_var(CacheManager::PATH_KEY, file_name);
         block_on(CacheManager::new())
     }
 
-    fn remove_cache_file() {
-        std::fs::remove_file(CACHE_FILE_PATH).expect("Unable to remove test file");
+    fn remove_cache_file(file_name: &str) {
+        let file_name = format!("{}{}", CACHE_FILE_PATH, file_name);
+        std::fs::remove_file(file_name).expect("Unable to remove test file");
     }
 
     #[test]
     fn test_bunch_save() {
         let expected: Vec<String> = vec!["Hello".into(), "World".into()];
-        let mut manager = construct_manager();
+        let file_name = "bunch_save";
+        let mut manager = construct_manager(file_name);
         let res = block_on(manager.bunch_save(expected.clone()));
-        remove_cache_file();
+        remove_cache_file(file_name);
         assert_eq!(res, expected);
     }
 
     #[test]
     fn test_bunch_read_after_save() {
         let expected: Vec<String> = vec!["Hello".into(), "World".into()];
-        let mut manager = construct_manager();
+        let file_name = "_bunch_read";
+        let mut manager = construct_manager(file_name);
         block_on(manager.bunch_save(expected.clone()));
         let read_values: Vec<String> = block_on(manager.bunch_read());
-        remove_cache_file();
+        remove_cache_file(file_name);
         assert_eq!(read_values, expected);
     }
 
     #[test]
     fn test_multiple_save() {
         let expected: Vec<String> = vec!["Hello".into(), "World".into()];
-        let mut manager = construct_manager();
+        let file_name = "_multiple_save";
+        let mut manager = construct_manager(file_name);
         for _ in 0..5 {
             block_on(manager.bunch_save(expected.clone()));
         }
         let read_values: Vec<String> = block_on(manager.bunch_read());
-        remove_cache_file();
+        remove_cache_file(file_name);
         assert_eq!(read_values, expected);
     }
 }
