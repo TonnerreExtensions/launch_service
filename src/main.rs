@@ -26,11 +26,19 @@ fn main() {
         .value_name("ID")
         .help("Launch service with given id")
         .takes_value(true)
+    ).arg(Arg::with_name("alter_execute")
+        .short("X")
+        .long("alt-execute")
+        .value_name("ID")
+        .help("Reveal service with given id")
+        .takes_value(true)
     ).get_matches();
     if let Some(query) = matches.value_of("query") {
         let services = query::query(query);
         stdout().lock().write(&services).expect("Unable to write to stdout");
     } else if let Some(id) = matches.value_of("execute") {
-        execute::execute(id);
+        execute::execute(id, false);
+    } else if let Some(id) = matches.value_of("alter_execute") {
+        execute::execute(id, true);
     }
 }
