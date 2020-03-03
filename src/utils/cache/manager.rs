@@ -1,13 +1,15 @@
 use async_std::fs::File;
 use async_std::fs::OpenOptions;
-use futures::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use async_std::sync::Mutex;
 use futures::io::SeekFrom;
+use futures::stream::FuturesUnordered;
+use futures::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, StreamExt};
 
-use crate::utils::serde::deserializer::{Deserializable, deserialize_from_bytes};
+use crate::utils::serde::deserializer::{deserialize_from_bytes, Deserializable};
 use crate::utils::serde::serializer::Serializable;
 
 pub struct CacheManager {
-    cache_file: Option<File>
+    cache_file: Option<Mutex<File>>,
 }
 
 impl CacheManager {
@@ -20,23 +22,28 @@ impl CacheManager {
                 .create(false)
                 .read(true)
                 .write(true)
-                .open(path).await
+                .open(path)
+                .await
                 .ok(),
-            _ => None
-        };
+            _ => None,
+        }
+        .map(Mutex::new);
         CacheManager { cache_file }
     }
 
-    pub async fn bunch_read<S: Deserializable>(&mut self) -> Vec<S> {
-        let mut bytes = match &mut self.cache_file {
+    pub async fn bunch_read<S: Deserializable>(&self) -> Vec<S> {
+        let mut bytes = match &self.cache_file {
             Some(file) => {
-                if let Ok(_) = file.seek(SeekFrom::Start(0)).await {
+                let res = file.lock().await.seek(SeekFrom::Start(0)).await;
+                if let Ok(_) = res {
                     let mut bytes: Vec<u8> = vec![];
-                    let _ = file.read_to_end(&mut bytes).await;
+                    let _ = file.lock().await.read_to_end(&mut bytes).await;
                     bytes
-                } else { vec![] }
+                } else {
+                    vec![]
+                }
             }
-            _ => vec![]
+            _ => vec![],
         };
         let mut res = vec![];
         while let Ok(obj) = deserialize_from_bytes::<S>(&mut bytes) {
@@ -45,30 +52,43 @@ impl CacheManager {
         res
     }
 
-    async fn save<S: Serializable>(&mut self, datum: S) -> S {
-        match &mut self.cache_file {
+    async fn save<S: Serializable>(&self, datum: S) -> S {
+        match &self.cache_file {
             Some(file) => {
                 let bytes = datum.serialize();
-                let _ = file.write_all(
-                    &(bytes.len() as u16).to_be_bytes()
-                        .to_vec()
-                        .into_iter()
-                        .chain(bytes.into_iter())
-                        .collect::<Vec<_>>()
-                ).await;
+                let _ = file
+                    .lock()
+                    .await
+                    .write_all(
+                        &(bytes.len() as u16)
+                            .to_be_bytes()
+                            .to_vec()
+                            .into_iter()
+                            .chain(bytes.into_iter())
+                            .collect::<Vec<_>>(),
+                    )
+                    .await;
             }
-            _ => ()
+            _ => (),
         }
         datum
     }
 
-    pub async fn bunch_save<S: Serializable>(&mut self, data: Vec<S>) -> Vec<S> {
-        if let Some(file) = &mut self.cache_file {
-            file.seek(SeekFrom::Start(0)).await.expect("Unable to start from beginning");
+    pub async fn bunch_save<S: Serializable>(&self, data: Vec<S>) -> Vec<S> {
+        if let Some(file) = &self.cache_file {
+            file.lock()
+                .await
+                .seek(SeekFrom::Start(0))
+                .await
+                .expect("Unable to start from beginning");
         }
-        let mut res = vec![];
-        for datum in data {
-            res.push(self.save(datum).await);
+        let mut futures = data
+            .into_iter()
+            .map(|datum| self.save(datum))
+            .collect::<FuturesUnordered<_>>();
+        let mut res = Vec::new();
+        while let Some(datum) = futures.next().await {
+            res.push(datum)
         }
         res
     }
@@ -100,7 +120,7 @@ mod cache_manager_test {
     fn test_bunch_save() {
         let expected: Vec<String> = vec!["Hello".into(), "World".into()];
         let file_name = "bunch_save";
-        let mut manager = construct_manager(file_name);
+        let manager = construct_manager(file_name);
         let res = block_on(manager.bunch_save(expected.clone()));
         remove_cache_file(file_name);
         assert_eq!(res, expected);
@@ -110,7 +130,7 @@ mod cache_manager_test {
     fn test_bunch_read_after_save() {
         let expected: Vec<String> = vec!["Hello".into(), "World".into()];
         let file_name = "_bunch_read";
-        let mut manager = construct_manager(file_name);
+        let manager = construct_manager(file_name);
         block_on(manager.bunch_save(expected.clone()));
         let read_values: Vec<String> = block_on(manager.bunch_read());
         remove_cache_file(file_name);
@@ -121,7 +141,7 @@ mod cache_manager_test {
     fn test_multiple_save() {
         let expected: Vec<String> = vec!["Hello".into(), "World".into()];
         let file_name = "_multiple_save";
-        let mut manager = construct_manager(file_name);
+        let manager = construct_manager(file_name);
         for _ in 0..5 {
             block_on(manager.bunch_save(expected.clone()));
         }
