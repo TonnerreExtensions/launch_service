@@ -31,7 +31,7 @@ impl CacheManager {
         CacheManager { cache_file }
     }
 
-    pub async fn bunch_read<S: Deserializable>(&self) -> Vec<S> {
+    pub async fn bunch_read<S: Deserializable>(&mut self) -> Vec<S> {
         let mut bytes = match &self.cache_file {
             Some(file) => {
                 let res = file.lock().await.seek(SeekFrom::Start(0)).await;
@@ -74,7 +74,7 @@ impl CacheManager {
         datum
     }
 
-    pub async fn bunch_save<S: Serializable>(&self, data: Vec<S>) -> Vec<S> {
+    pub async fn bunch_save<S: Serializable>(&mut self, data: Vec<S>) -> Vec<S> {
         if let Some(file) = &self.cache_file {
             file.lock()
                 .await
@@ -120,7 +120,7 @@ mod cache_manager_test {
     fn test_bunch_save() {
         let expected: Vec<String> = vec!["Hello".into(), "World".into()];
         let file_name = "bunch_save";
-        let manager = construct_manager(file_name);
+        let mut manager = construct_manager(file_name);
         let res = block_on(manager.bunch_save(expected.clone()));
         remove_cache_file(file_name);
         assert_eq!(res, expected);
@@ -130,7 +130,7 @@ mod cache_manager_test {
     fn test_bunch_read_after_save() {
         let expected: Vec<String> = vec!["Hello".into(), "World".into()];
         let file_name = "_bunch_read";
-        let manager = construct_manager(file_name);
+        let mut manager = construct_manager(file_name);
         block_on(manager.bunch_save(expected.clone()));
         let read_values: Vec<String> = block_on(manager.bunch_read());
         remove_cache_file(file_name);
@@ -141,7 +141,7 @@ mod cache_manager_test {
     fn test_multiple_save() {
         let expected: Vec<String> = vec!["Hello".into(), "World".into()];
         let file_name = "_multiple_save";
-        let manager = construct_manager(file_name);
+        let mut manager = construct_manager(file_name);
         for _ in 0..5 {
             block_on(manager.bunch_save(expected.clone()));
         }
