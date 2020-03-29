@@ -1,8 +1,9 @@
 pub use query::QueryProcessor;
 
-mod query;
 mod checker;
 mod matcher;
+mod query;
+mod response;
 mod service;
 
 pub fn query(req: &str) -> Vec<u8> {

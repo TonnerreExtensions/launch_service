@@ -2,68 +2,55 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 
-use crate::utils::serde::deserializer::{Deserializable, DeserializableError};
-use crate::utils::serde::serializer::{Serializable, serialize_to_bytes};
+use serde::{Deserialize, Serialize};
 
 lazy_static! {
-    pub static ref NAME_MAP: HashMap<&'static str, &'static str> = [("And", "&")]
-        .iter().cloned().collect();
+    pub static ref NAME_MAP: HashMap<&'static str, &'static str> =
+        [("And", "&")].iter().cloned().collect();
 }
 
 fn map_term(name: &str) -> &str {
     NAME_MAP.get(name).unwrap_or(&name)
 }
 
+#[derive(Serialize)]
+pub struct FullService<'a> {
+    title: &'a str,
+    subtitle: &'a OsStr,
+    id: &'a OsStr,
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct Service {
-    pub path: PathBuf
+    pub path: PathBuf,
 }
 
 impl Service {
     pub fn new<P: Into<PathBuf>>(path: P) -> Self {
         Service { path: path.into() }
     }
-}
 
-impl Serializable for Service {
-    fn serialize(&self) -> Vec<u8> {
-        let name = self.path.file_stem()
-            .and_then(OsStr::to_str)
-            .map(map_term)
-            .unwrap_or_default();
-        let name = serialize_to_bytes(&name[..]);
-        let content = serialize_to_bytes(
-            self.path.to_str().expect("Path cannot be stringified")
-        );
-        content.clone().into_iter()
-            .chain(name.into_iter())
-            .chain(content.into_iter())
-            .collect()
+    fn file_name(&self) -> &str {
+        let path_process = self.path.file_stem().and_then(OsStr::to_str);
+        match self.path.extension().and_then(|ext| ext.to_str()) {
+            Some("prefPane") => path_process.map(map_term),
+            _ => path_process,
+        }
+        .unwrap_or_default()
     }
-}
 
-impl Serializable for &str {
-    fn serialize(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
-    }
-}
-
-impl Deserializable for Service {
-    fn deserialize(bytes: Vec<u8>) -> Result<Self, DeserializableError> where Self: std::marker::Sized {
-        Ok(
-            Service::new(
-                PathBuf::from(String::from_utf8(bytes)?)
-            )
-        )
+    pub fn full_service(&self) -> FullService {
+        FullService {
+            title: self.file_name(),
+            subtitle: self.path.as_os_str(),
+            id: self.path.as_os_str(),
+        }
     }
 }
 
 #[cfg(test)]
-mod service_serde_test {
-    use std::path::PathBuf;
-
+mod service_test {
     use crate::query::service::{map_term, Service};
-    use crate::utils::serde::deserializer::Deserializable;
-    use crate::utils::serde::serializer::serialize_to_bytes;
 
     #[test]
     fn test_map_term() {
@@ -72,29 +59,44 @@ mod service_serde_test {
 
     #[test]
     fn test_serialize() {
-        let path = "/System/Applications/Books.app";
-        let service = Service::new(PathBuf::from(path));
-        let bytes = serialize_to_bytes(service);
-
-        let name = serialize_to_bytes("Books");
-        let content = serialize_to_bytes(path);
-        let chained: Vec<u8> = content.clone().into_iter()
-            .chain(name.into_iter())
-            .chain(content.into_iter())
-            .collect();
-        let expected: Vec<u8> = (chained.len() as u16).to_be_bytes()
-            .to_vec().into_iter()
-            .chain(chained.into_iter())
-            .collect();
-
-        assert_eq!(bytes, expected);
+        let path = "/System/Applications/Book.app";
+        let service = Service::new(path);
+        let serialized = serde_json::to_string(&service).expect("Unable to serialize");
+        let expected = r#"{"path":"/System/Applications/Book.app"}"#;
+        assert_eq!(serialized, expected);
     }
 
     #[test]
     fn test_deserialize() {
-        let path = "/System/Applications/Books.app";
-        let service = Service::deserialize(path.as_bytes().to_vec()).unwrap();
+        let source = r#"{"path":"/System/Applications/Book.app"}"#;
+        let service: Service = serde_json::from_str(source).expect("Unable to deserialize");
+        let expected = "/System/Applications/Book.app";
+        assert_eq!(service.path.to_str().unwrap_or(""), expected);
+    }
 
-        assert_eq!(service.path, PathBuf::from(path))
+    #[test]
+    fn test_bunch_serialize() {
+        let services = vec![
+            Service::new("/System/Applications/Book.app"),
+            Service::new("/System/Applications/Safari.app"),
+        ];
+        let serialized = serde_json::to_string(&services).expect("Unable to serialize");
+        let expected = r#"[{"path":"/System/Applications/Book.app"},{"path":"/System/Applications/Safari.app"}]"#;
+        assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn test_bunch_deserialize() {
+        let source = r#"[{"path":"/System/Applications/Book.app"},{"path":"/System/Applications/Safari.app"}]"#;
+        let services: Vec<Service> = serde_json::from_str(source).expect("Unable to deserialize");
+        let services = services
+            .iter()
+            .map(|service| service.path.to_str().unwrap_or(""))
+            .collect::<Vec<_>>();
+        let expected = vec![
+            "/System/Applications/Book.app",
+            "/System/Applications/Safari.app",
+        ];
+        assert_eq!(services, expected);
     }
 }
