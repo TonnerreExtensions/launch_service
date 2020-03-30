@@ -2,6 +2,8 @@ use std::iter::FromIterator;
 
 use serde::Serialize;
 
+use crate::utils;
+
 static IDENTIFIER: &str = "IDENTIFIER";
 
 #[derive(Serialize)]
@@ -23,6 +25,6 @@ impl<S: Serialize> FromIterator<S> for Response<S> {
 
 impl<S: Serialize> Response<S> {
     pub fn serialize_to_json(self) -> Vec<u8> {
-        serde_json::to_vec(&self).unwrap_or(vec![])
+        utils::serde::serialize_to_bytes(&self).unwrap_or_default()
     }
 }

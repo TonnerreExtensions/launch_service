@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::utils;
+
 pub struct CacheManager {
     path: Option<PathBuf>,
 }
@@ -21,14 +23,14 @@ impl CacheManager {
             .as_ref()
             .and_then(|path| std::fs::read(path).ok())
             .unwrap_or_default();
-        serde_json::from_slice(&bytes).unwrap_or_default()
+        utils::serde::deserialize_from_bytes(&bytes).unwrap_or_default()
     }
 
     pub fn bunch_save<S: Serialize>(&self, data: Vec<S>) -> Vec<S> {
         if self.path.is_none() {
             return data;
         }
-        let bytes = serde_json::to_vec(&data);
+        let bytes = utils::serde::serialize_to_bytes(&data);
         let res = match bytes {
             Ok(bytes) => std::fs::write(self.path.as_ref().unwrap(), bytes),
             Err(err) => Err(Error::new(ErrorKind::InvalidData, err)),

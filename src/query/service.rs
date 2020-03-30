@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 lazy_static! {
     pub static ref NAME_MAP: HashMap<&'static str, &'static str> =
@@ -20,7 +20,6 @@ pub struct FullService<'a> {
     id: &'a OsStr,
 }
 
-#[derive(Deserialize, Serialize)]
 pub struct Service {
     pub path: PathBuf,
 }
@@ -48,6 +47,25 @@ impl Service {
     }
 }
 
+impl Serialize for Service {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        self.path.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Service {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let path = PathBuf::deserialize(deserializer)?;
+        Ok(Service::new(path))
+    }
+}
+
 #[cfg(test)]
 mod service_test {
     use crate::query::service::{map_term, Service};
@@ -62,13 +80,13 @@ mod service_test {
         let path = "/System/Applications/Book.app";
         let service = Service::new(path);
         let serialized = serde_json::to_string(&service).expect("Unable to serialize");
-        let expected = r#"{"path":"/System/Applications/Book.app"}"#;
+        let expected = r#""/System/Applications/Book.app""#;
         assert_eq!(serialized, expected);
     }
 
     #[test]
     fn test_deserialize() {
-        let source = r#"{"path":"/System/Applications/Book.app"}"#;
+        let source = r#""/System/Applications/Book.app""#;
         let service: Service = serde_json::from_str(source).expect("Unable to deserialize");
         let expected = "/System/Applications/Book.app";
         assert_eq!(service.path.to_str().unwrap_or(""), expected);
@@ -81,13 +99,13 @@ mod service_test {
             Service::new("/System/Applications/Safari.app"),
         ];
         let serialized = serde_json::to_string(&services).expect("Unable to serialize");
-        let expected = r#"[{"path":"/System/Applications/Book.app"},{"path":"/System/Applications/Safari.app"}]"#;
+        let expected = r#"["/System/Applications/Book.app","/System/Applications/Safari.app"]"#;
         assert_eq!(serialized, expected);
     }
 
     #[test]
     fn test_bunch_deserialize() {
-        let source = r#"[{"path":"/System/Applications/Book.app"},{"path":"/System/Applications/Safari.app"}]"#;
+        let source = r#"["/System/Applications/Book.app", "/System/Applications/Safari.app"]"#;
         let services: Vec<Service> = serde_json::from_str(source).expect("Unable to deserialize");
         let services = services
             .iter()
