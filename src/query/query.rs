@@ -1,12 +1,11 @@
 use std::collections::VecDeque;
 
 use async_std::fs::read_dir;
-use async_std::path::{Path, PathBuf};
+use async_std::path::PathBuf;
 use futures::executor::block_on;
 use futures::future::{join, join_all};
 use futures::StreamExt;
 
-use crate::configurator::Configs;
 use crate::query::checker::{Checker, Outcome};
 use crate::query::matcher;
 use crate::query::response::Response;
@@ -14,20 +13,14 @@ use crate::query::service::Service;
 use crate::utils::cache::CacheManager;
 
 pub struct QueryProcessor {
-    config: Configs,
     checker: Checker,
 }
 
 impl QueryProcessor {
-    const CONFIG_PATH: &'static str = "settings.yaml";
-
     /// New query processor
     pub fn new() -> Self {
-        let config =
-            Configs::from(Path::new(Self::CONFIG_PATH).into()).expect("settings.yaml is missing");
-        let ignored_paths = config.get_ignore_paths();
+        let ignored_paths = crate::CONFIG.get_ignore_paths();
         QueryProcessor {
-            config,
             checker: Checker::new(ignored_paths),
         }
     }
@@ -47,7 +40,6 @@ impl QueryProcessor {
         cached_services
             .iter()
             .chain(updated_services.iter())
-            .map(|service| service.full_service())
             .collect::<Response<_>>()
             .serialize_to_json()
     }
@@ -59,7 +51,7 @@ impl QueryProcessor {
             Some(cache) if !cache.is_empty() => cache,
             _ => cache_manager.bunch_save(
                 join_all(
-                    self.config
+                    crate::CONFIG
                         .get_internal_cached()
                         .into_iter()
                         .map(|path| self.walk_paths(path)),
@@ -72,14 +64,13 @@ impl QueryProcessor {
             ),
         }
         .into_iter()
-        .filter(|service| service.path.to_str().is_some())
-        .filter(|service| matcher::match_query(&req, service.path.to_str().unwrap()))
+        .filter(|service| matcher::match_query(&req, &service.title))
         .collect()
     }
 
     async fn query_updated_services(&self, req: &str) -> Vec<Service> {
         join_all(
-            self.config
+            crate::CONFIG
                 .get_internal_updated()
                 .into_iter()
                 .map(|path| self.walk_paths(path)),
@@ -87,9 +78,8 @@ impl QueryProcessor {
         .await
         .into_iter()
         .flatten()
-        .filter(|path| path.to_str().is_some())
-        .filter(|path| matcher::match_query(&req, path.to_str().unwrap()))
         .map(Service::new)
+        .filter(|service| matcher::match_query(&req, &service.title))
         .collect()
     }
 
@@ -141,6 +131,8 @@ mod query_test {
 
     #[test]
     fn test_walk_dir_single() {
+        let settings = std::env::current_dir().unwrap().join("settings.yaml");
+        std::env::set_var("SETTINGS", settings);
         let processor = QP::new();
         let single_file = PathBuf::from(APP_PATH);
         let expected = PathBuf::from(APP_PATH);
@@ -150,6 +142,8 @@ mod query_test {
 
     #[test]
     fn test_walk_dir_inside_book() {
+        let settings = std::env::current_dir().unwrap().join("settings.yaml");
+        std::env::set_var("SETTINGS", settings);
         let processor = QP::new();
         let content = PathBuf::from(APP_FOLDER_PATH);
         let res = block_on(processor.walk_paths(content));

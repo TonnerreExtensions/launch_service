@@ -1,95 +1,67 @@
-use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
-lazy_static! {
-    pub static ref NAME_MAP: HashMap<&'static str, &'static str> =
-        [("And", "&")].iter().cloned().collect();
+use super::matcher;
+
+fn map_term(name: &str) -> String {
+    crate::CONFIG
+        .get_pref_names()
+        .get(name)
+        .map(String::to_owned)
+        .unwrap_or(matcher::tokenize(name).join(" "))
 }
 
-fn map_term(name: &str) -> &str {
-    NAME_MAP.get(name).unwrap_or(&name)
-}
-
-#[derive(Serialize)]
-pub struct FullService<'a> {
-    title: &'a str,
-    subtitle: &'a OsStr,
-    id: &'a OsStr,
-}
-
+#[derive(Serialize, Deserialize)]
 pub struct Service {
-    pub path: PathBuf,
+    pub title: String,
+    subtitle: PathBuf,
+    id: PathBuf,
 }
 
 impl Service {
     pub fn new<P: Into<PathBuf>>(path: P) -> Self {
-        Service { path: path.into() }
+        let path = path.into();
+        let title = Self::file_name(&path);
+        let subtitle = path.clone();
+        Service {
+            title,
+            subtitle,
+            id: path,
+        }
     }
 
-    fn file_name(&self) -> &str {
-        let path_process = self.path.file_stem().and_then(OsStr::to_str);
-        match self.path.extension().and_then(|ext| ext.to_str()) {
+    fn file_name<P: AsRef<Path>>(path: P) -> String {
+        let path = path.as_ref();
+        let path_process = path.file_stem().and_then(OsStr::to_str);
+        match path.extension().and_then(|ext| ext.to_str()) {
             Some("prefPane") => path_process.map(map_term),
-            _ => path_process,
+            _ => path_process.map(String::from),
         }
         .unwrap_or_default()
-    }
-
-    pub fn full_service(&self) -> FullService {
-        FullService {
-            title: self.file_name(),
-            subtitle: self.path.as_os_str(),
-            id: self.path.as_os_str(),
-        }
-    }
-}
-
-impl Serialize for Service {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        self.path.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for Service {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let path = PathBuf::deserialize(deserializer)?;
-        Ok(Service::new(path))
     }
 }
 
 #[cfg(test)]
 mod service_test {
-    use crate::query::service::{map_term, Service};
-
-    #[test]
-    fn test_map_term() {
-        assert_eq!(map_term("And"), "&");
-    }
+    use crate::query::service::Service;
 
     #[test]
     fn test_serialize() {
         let path = "/System/Applications/Book.app";
         let service = Service::new(path);
         let serialized = serde_json::to_string(&service).expect("Unable to serialize");
-        let expected = r#""/System/Applications/Book.app""#;
+        let expected = r#"{"title":"Book","subtitle":"/System/Applications/Book.app","id":"/System/Applications/Book.app"}"#;
         assert_eq!(serialized, expected);
     }
 
     #[test]
     fn test_deserialize() {
-        let source = r#""/System/Applications/Book.app""#;
+        let source = r#"{"title":"Book","subtitle":"/System/Applications/Book.app","id":"/System/Applications/Book.app"}"#;
         let service: Service = serde_json::from_str(source).expect("Unable to deserialize");
         let expected = "/System/Applications/Book.app";
-        assert_eq!(service.path.to_str().unwrap_or(""), expected);
+        assert_eq!(service.id.to_str().unwrap_or(""), expected);
     }
 
     #[test]
@@ -99,17 +71,18 @@ mod service_test {
             Service::new("/System/Applications/Safari.app"),
         ];
         let serialized = serde_json::to_string(&services).expect("Unable to serialize");
-        let expected = r#"["/System/Applications/Book.app","/System/Applications/Safari.app"]"#;
+        let expected = r#"[{"title":"Book","subtitle":"/System/Applications/Book.app","id":"/System/Applications/Book.app"},{"title":"Safari","subtitle":"/System/Applications/Safari.app","id":"/System/Applications/Safari.app"}]"#;
         assert_eq!(serialized, expected);
     }
 
     #[test]
     fn test_bunch_deserialize() {
-        let source = r#"["/System/Applications/Book.app", "/System/Applications/Safari.app"]"#;
+        let source = r#"[{"title":"Book","subtitle":"/System/Applications/Book.app","id":"/System/Applications/Book.app"}
+        ,{"title":"Safari","subtitle":"/System/Applications/Safari.app","id":"/System/Applications/Safari.app"}]"#;
         let services: Vec<Service> = serde_json::from_str(source).expect("Unable to deserialize");
         let services = services
             .iter()
-            .map(|service| service.path.to_str().unwrap_or(""))
+            .map(|service| service.id.to_str().unwrap_or(""))
             .collect::<Vec<_>>();
         let expected = vec![
             "/System/Applications/Book.app",

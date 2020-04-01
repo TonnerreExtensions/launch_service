@@ -7,8 +7,9 @@ pub fn match_query(query: &str, target: &str) -> bool {
 /// Simple match that query is the prefix of target
 /// Example: `Activity Manager` matches `act` or `ma`
 fn prefix_match(query: &str, target: &str) -> bool {
-    target.to_lowercase().starts_with(query) ||
-        tokenize_and_clean(target).into_iter()
+    target.to_lowercase().starts_with(query)
+        || tokenize_and_clean(target)
+            .into_iter()
             .map(str::to_lowercase)
             .any(|component| component.starts_with(query))
 }
@@ -24,16 +25,21 @@ fn initial_match(query: &str, target: &str) -> bool {
 ///     - `am` matches with `*A*ctivity *M*onitor`
 ///     - `actmo` matches with `**Act**ivity **Mo**nitor`
 fn match_components_prefix(query: &str, target: &[&str]) -> bool {
-    if query.is_empty() { true } else if target.is_empty() { false } else {
-        let processing = target.first()
-            .expect("Get first target component failed");
-        for (index, (query_char, target_char)) in query.chars()
-            .zip(processing.chars()).enumerate() {
+    if query.is_empty() {
+        true
+    } else if target.is_empty() {
+        false
+    } else {
+        let processing = target.first().expect("Get first target component failed");
+        for (index, (query_char, target_char)) in query.chars().zip(processing.chars()).enumerate()
+        {
             if query_char.eq_ignore_ascii_case(&target_char) {
                 if match_components_prefix(&query[index + 1..], &target[1..]) {
                     return true;
                 }
-            } else { break; }
+            } else {
+                break;
+            }
         }
         false
     }

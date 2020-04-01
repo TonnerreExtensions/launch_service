@@ -11,3 +11,30 @@ internal:
   updated:
     - "~/Applications"
     - "/Applications"
+  prefNames:
+    SoftwareUpdate: Software Update
+    iCloudPref: iCloud
+    Accounts: Users & Groups
+    AppStore: App Store
+    Appearance: General
+    DateAndTime: Date & Time
+    DesktopScreenEffectsPref: Desktop & Screen Saver
+    DigiHubDiscs: CDs & DVDs
+    EnergySaver: Energy Saver
+    Expose: Mission Control
+    FibreChannel: Fibre Channel
+    InternetAccounts: Internet Accounts
+    Localization: Language & Region
+    ParentalControls: Parental Controls
+    PrintAndFax: Printers & Fax
+    PrintAndScan: Printers & Scanners
+    Security: Security & Privacy
+    SharingPref: Sharing
+    Speech: Siri
+    StartupDisk: Startup Disk
+    TimeMachine: Time Machine
+    TouchID: Touch ID
+    UniversalAccessPref: Accessibility
+    Wallet: Wallet & Apple Pay
+    AppleIDPrefPane: Apple ID
+    FamilySharingPrefPane: Family Sharing

@@ -1,13 +1,10 @@
 use std::collections::HashSet;
 
-lazy_static! {
-    pub static ref STOP_WORDS: HashSet<&'static str> = vec!["and", "&", "And"].into_iter().collect();
-}
-
 pub fn tokenize_and_clean(name: &str) -> Vec<&str> {
+    let stop_words: HashSet<&str> = vec!["and", "&", "And"].into_iter().collect();
     tokenize(name)
         .into_iter()
-        .filter(|term| !STOP_WORDS.contains(term))
+        .filter(|term| !stop_words.contains(term))
         .collect()
 }
 
@@ -23,20 +20,56 @@ pub fn tokenize(name: &str) -> Vec<&str> {
 fn tokenize_camel_case<'a>(name: &'a str) -> Vec<&'a str> {
     let mut tokens = Vec::<&'a str>::new();
     let mut start_index: usize = 0;
-    let mut prev_is_capital: u8 = name.chars().next()
-        .expect("name is empty")
-        .is_uppercase() as u8;
-    let is_case_different = |prev: u8, curr: u8| prev ^ curr == 1;
+    let first_char = name.chars().next().expect("name is empty");
+    let mut prev_case = Case::from(first_char);
     for (index, character) in name.char_indices() {
-        if is_case_different(prev_is_capital, character.is_uppercase() as u8) &&
-            index - start_index > 1 {
+        let case = Case::from(character);
+        let diff = prev_case.diff(&case);
+        if (diff == Diff::Sinking && index - start_index > 1)
+            || (diff == Diff::CharType)
+            || (diff == Diff::Rising)
+        {
             tokens.push(&name[start_index..index]);
             start_index = index;
         }
-        prev_is_capital = character.is_uppercase() as u8;
+        prev_case = case;
     }
     tokens.push(&name[start_index..]);
     tokens
+}
+
+enum Case {
+    None,
+    Lower,
+    Upper,
+}
+
+#[derive(Eq, PartialEq)]
+enum Diff {
+    None,
+    Rising,
+    Sinking,
+    CharType,
+}
+
+impl Case {
+    fn from(target: char) -> Self {
+        match (target.is_alphabetic(), target.is_lowercase()) {
+            (false, _) => Case::None,
+            (true, true) => Case::Lower,
+            (true, false) => Case::Upper,
+        }
+    }
+
+    fn diff(&self, another: &Case) -> Diff {
+        use Case::*;
+        match (self, another) {
+            (None, None) | (Lower, Lower) | (Upper, Upper) => Diff::None,
+            (Lower, Upper) => Diff::Rising,
+            (Upper, Lower) => Diff::Sinking,
+            _ => Diff::CharType,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -75,6 +108,13 @@ mod cleaner_test {
     fn test_tokenize_mixed_camel_case() {
         let res = tokenize_camel_case("IDandUserInformation");
         let expected = vec!["ID", "and", "User", "Information"];
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn test_tokenize_with_non_alphabet() {
+        let res = tokenize_camel_case("Go2Shell");
+        let expected = vec!["Go", "2", "Shell"];
         assert_eq!(res, expected);
     }
 }
