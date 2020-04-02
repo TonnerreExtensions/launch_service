@@ -13,7 +13,7 @@ fn map_term(name: &str) -> String {
         .unwrap_or(matcher::tokenize(name).join(" "))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Service {
     pub title: String,
     subtitle: PathBuf,

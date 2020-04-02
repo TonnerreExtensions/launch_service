@@ -1,7 +1,5 @@
 extern crate clap;
 
-use std::io::{stdout, Write};
-
 use clap::{App, Arg};
 
 use lazy_static::lazy_static;
@@ -47,14 +45,12 @@ fn main() {
         )
         .get_matches();
     if let Some(query) = matches.value_of("query") {
-        let services = query::query(query);
-        stdout()
-            .lock()
-            .write(&services)
-            .expect("Unable to write to stdout");
+        let output = std::env::var("OUTPUT").expect("Cannot get OUTPUT from env");
+        let services = query::query(query.trim());
+        std::fs::write(output, services).expect("Failed to write to OUTPUT");
     } else if let Some(id) = matches.value_of("execute") {
-        execute::execute(id, false);
+        execute::execute(id.trim(), false);
     } else if let Some(id) = matches.value_of("alter_execute") {
-        execute::execute(id, true);
+        execute::execute(id.trim(), true);
     }
 }
