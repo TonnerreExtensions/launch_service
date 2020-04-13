@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet as Set};
 use std::io;
 use std::io::ErrorKind;
-use std::path::Path;
 
 use async_std::path::PathBuf;
 use yaml_rust;
@@ -26,9 +25,9 @@ impl Configs {
     const PREFNAME_KEY: &'static str = "prefNames";
 
     /// Construct config from given yaml file
-    pub fn from<P: AsRef<Path>>(config_file: P) -> io::Result<Self> {
-        let content = std::fs::read_to_string(config_file.as_ref())?;
-        match YamlLoader::load_from_str(&content) {
+    pub fn from<S: AsRef<str>>(content: S) -> io::Result<Self> {
+        let content = content.as_ref();
+        match YamlLoader::load_from_str(content) {
             Ok(mut files) => Ok(Configs {
                 file: match files.pop() {
                     Some(file) => file,
@@ -92,47 +91,42 @@ impl Configs {
 
 #[cfg(test)]
 mod configs_test {
-    use std::path::Path;
-
     use crate::configurator::configs::Configs;
 
-    const PATH: &'static str = "settings.yaml";
+    fn get_content() -> String {
+        std::fs::read_to_string("settings.yaml").expect("Failed to read settings.yaml")
+    }
 
     #[test]
     fn test_new() {
-        let path = Path::new(PATH);
-        let res = Configs::from(path);
+        let res = Configs::from(get_content());
         assert!(res.is_ok());
     }
 
     #[test]
     fn test_get_ignore_paths() {
-        let path = Path::new(PATH);
-        let res = Configs::from(path).unwrap();
+        let res = Configs::from(get_content()).unwrap();
         let ignore_path = res.get_ignore_paths();
         assert!(ignore_path.is_empty())
     }
 
     #[test]
     fn test_get_cached_paths() {
-        let path = Path::new(PATH);
-        let res = Configs::from(path).unwrap();
+        let res = Configs::from(get_content()).unwrap();
         let cached_path = res.get_internal_cached();
         assert_eq!(cached_path.len(), 4);
     }
 
     #[test]
     fn test_get_updated_paths() {
-        let path = Path::new(PATH);
-        let res = Configs::from(path).unwrap();
+        let res = Configs::from(get_content()).unwrap();
         let updated_path = res.get_internal_updated();
         assert_eq!(updated_path.len(), 2);
     }
 
     #[test]
     fn test_get_pref_names() {
-        let path = Path::new(PATH);
-        let res = Configs::from(path).unwrap();
+        let res = Configs::from(get_content()).unwrap();
         let pref_names = res.get_pref_names();
         assert_eq!(pref_names.len(), 26);
     }
