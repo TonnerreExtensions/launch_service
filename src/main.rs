@@ -47,7 +47,6 @@ fn main() {
     if let Some(query) = matches.value_of("query") {
         let output = std::env::var("OUTPUT").expect("Cannot get OUTPUT from env");
         let services = query::query(query.trim());
-        let _ = std::fs::write("/Users/cheng/Desktop/output", output.as_str());
         std::fs::write(output, services).expect("Failed to write to OUTPUT");
     } else if let Some(id) = matches.value_of("execute") {
         execute::execute(id.trim(), false);
