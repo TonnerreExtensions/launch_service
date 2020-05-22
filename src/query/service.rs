@@ -21,14 +21,14 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn new<P: Into<PathBuf>>(path: P) -> Self {
-        let path = path.into();
+    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+        let path = path.as_ref();
         let title = Self::file_name(&path);
-        let subtitle = path.clone();
+        let subtitle = path.to_path_buf();
         Service {
             title,
             subtitle,
-            id: path,
+            id: path.to_path_buf(),
         }
     }
 

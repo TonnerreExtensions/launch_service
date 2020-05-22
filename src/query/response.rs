@@ -9,17 +9,14 @@ static IDENTIFIER: &str = "IDENTIFIER";
 #[derive(Serialize)]
 pub struct Response<S: Serialize> {
     services: Vec<S>,
-    identifier: String,
+    provider: String,
 }
 
 impl<S: Serialize> FromIterator<S> for Response<S> {
     fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {
         let services = iter.into_iter().collect::<Vec<_>>();
-        let identifier = std::env::var(IDENTIFIER).expect("Unable to get IDENTIFIER from env");
-        Response {
-            services,
-            identifier,
-        }
+        let provider = std::env::var(IDENTIFIER).expect("Unable to get IDENTIFIER from env");
+        Response { services, provider }
     }
 }
 

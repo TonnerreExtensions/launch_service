@@ -13,7 +13,7 @@ lazy_static! {
     pub static ref CONFIG: configurator::Configs = configurator::Configs::from(
         std::env::var("SETTINGS").expect("Failed to get SETTINGS from environment")
     )
-    .expect("settings.yaml is missing");
+    .expect("settings is invalid");
 }
 
 fn main() {
@@ -47,6 +47,7 @@ fn main() {
     if let Some(query) = matches.value_of("query") {
         let output = std::env::var("OUTPUT").expect("Cannot get OUTPUT from env");
         let services = query::query(query.trim());
+        let _ = std::fs::write("/Users/cheng/Desktop/output", output.as_str());
         std::fs::write(output, services).expect("Failed to write to OUTPUT");
     } else if let Some(id) = matches.value_of("execute") {
         execute::execute(id.trim(), false);

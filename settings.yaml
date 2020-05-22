@@ -1,7 +1,7 @@
 configurable:
   ignorePaths:
     displayName: "Paths to Ignore"
-    values: []
+    value: []
 internal:
   cached:
     - "/System/Library/CoreServices/Finder.app"

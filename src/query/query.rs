@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::path::Path;
 
 use async_std::fs::read_dir;
 use async_std::path::PathBuf;
@@ -12,11 +13,11 @@ use crate::query::response::Response;
 use crate::query::service::Service;
 use crate::utils::cache::CacheManager;
 
-pub struct QueryProcessor {
-    checker: Checker,
+pub struct QueryProcessor<'a> {
+    checker: Checker<'a>,
 }
 
-impl QueryProcessor {
+impl<'a> QueryProcessor<'a> {
     /// New query processor
     pub fn new() -> Self {
         let ignored_paths = crate::CONFIG.get_ignore_paths();
@@ -84,14 +85,15 @@ impl QueryProcessor {
     }
 
     /// Recursively iterate through files and folders, and return all legit file paths
-    async fn walk_paths(&self, entry: PathBuf) -> Vec<PathBuf> {
-        match self.checker.check(&entry) {
+    async fn walk_paths<P: AsRef<Path>>(&self, entry: P) -> Vec<PathBuf> {
+        let entry = entry.as_ref();
+        match self.checker.check(entry) {
             Outcome::UnwantedPath => vec![],
-            Outcome::BundlePath => vec![entry],
+            Outcome::BundlePath => vec![entry.to_owned().into()],
             Outcome::NormalPath => {
                 let (mut res, mut remaining) = self.separate_files_and_dirs(entry).await;
                 while let Some(entry) = remaining.pop_front() {
-                    let (processed, unprocessed) = self.separate_files_and_dirs(entry).await;
+                    let (processed, unprocessed) = self.separate_files_and_dirs(&entry).await;
                     res.extend(processed);
                     remaining.extend(unprocessed);
                 }
@@ -101,10 +103,20 @@ impl QueryProcessor {
     }
 
     /// walk through all files in the given entry, and return paths for files and directories
-    async fn separate_files_and_dirs(&self, entry: PathBuf) -> (Vec<PathBuf>, VecDeque<PathBuf>) {
+    async fn separate_files_and_dirs<P: AsRef<Path>>(
+        &self,
+        entry: P,
+    ) -> (Vec<PathBuf>, VecDeque<PathBuf>) {
+        let entry = entry.as_ref();
         let mut processed = Vec::new();
         let mut folders = VecDeque::new();
-        let mut read_folder = read_dir(&entry).await.expect("Unwrap folder");
+        let mut read_folder = match read_dir(&entry).await {
+            Ok(read_folder) => read_folder,
+            Err(err) => {
+                println!("Read folder error: {}", err);
+                return (processed, folders);
+            }
+        };
         while let Some(Ok(path)) = read_folder.next().await {
             let path = path.path();
             match self.checker.check(&path) {
@@ -124,29 +136,29 @@ mod query_test {
 
     use crate::query::query::QueryProcessor;
 
-    type QP = QueryProcessor;
+    type QP<'a> = QueryProcessor<'a>;
 
     const APP_PATH: &str = "/System/Applications/Books.app";
     const APP_FOLDER_PATH: &str = "/System/Applications";
 
     #[test]
     fn test_walk_dir_single() {
-        let settings = std::env::current_dir().unwrap().join("settings.yaml");
+        let settings = crate::configurator::get_content();
         std::env::set_var("SETTINGS", settings);
         let processor = QP::new();
         let single_file = PathBuf::from(APP_PATH);
         let expected = PathBuf::from(APP_PATH);
-        let res = block_on(processor.walk_paths(single_file));
+        let res = block_on(processor.walk_paths(&single_file));
         assert_eq!(&expected, &res[0]);
     }
 
     #[test]
     fn test_walk_dir_inside_book() {
-        let settings = std::env::current_dir().unwrap().join("settings.yaml");
+        let settings = crate::configurator::get_content();
         std::env::set_var("SETTINGS", settings);
         let processor = QP::new();
         let content = PathBuf::from(APP_FOLDER_PATH);
-        let res = block_on(processor.walk_paths(content));
+        let res = block_on(processor.walk_paths(&content));
         assert_eq!(52, res.len());
     }
 }

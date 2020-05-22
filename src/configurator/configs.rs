@@ -1,106 +1,133 @@
 use std::collections::{HashMap, HashSet as Set};
-use std::io;
-use std::io::ErrorKind;
+use std::io::{self, Error, ErrorKind};
+use std::path::PathBuf;
 
-use async_std::path::PathBuf;
-use yaml_rust;
-use yaml_rust::yaml::Yaml;
-use yaml_rust::YamlLoader;
+use serde::Deserialize;
 
 use crate::utils;
 
-/// Configs that are loaded from a yaml file
-#[derive(Debug)]
+#[derive(Deserialize)]
 pub struct Configs {
-    file: Yaml,
+    internal: Internal,
+    configurable: Configurable,
+}
+
+#[derive(Deserialize)]
+struct Internal {
+    cached: Set<PathBuf>,
+    updated: Set<PathBuf>,
+    #[serde(rename = "prefNames")]
+    preferred_names: HashMap<String, String>,
+}
+
+#[derive(Deserialize)]
+struct Configurable {
+    #[serde(rename = "ignorePaths")]
+    ignored_paths: ConfigurableValue,
+}
+
+#[derive(Deserialize)]
+struct ConfigurableValue {
+    value: Set<PathBuf>,
 }
 
 impl Configs {
-    const CONFIGURABLE_KEY: &'static str = "configurable";
-    const IGNORE_KEY: &'static str = "ignorePaths";
-    const VALUES_KEY: &'static str = "values";
-    const INTERNAL_KEY: &'static str = "internal";
-    const CACHED_KEY: &'static str = "cached";
-    const UPDATED_KEY: &'static str = "updated";
-    const PREFNAME_KEY: &'static str = "prefNames";
-
     /// Construct config from given yaml file
     pub fn from<S: AsRef<str>>(content: S) -> io::Result<Self> {
-        let content = content.as_ref();
-        match YamlLoader::load_from_str(content) {
-            Ok(mut files) => Ok(Configs {
-                file: match files.pop() {
-                    Some(file) => file,
-                    None => {
-                        return Err(io::Error::new(
-                            ErrorKind::InvalidData,
-                            "Failed to pop last of yaml",
-                        ))
-                    }
-                },
-            }),
-            Err(err) => Err(io::Error::new(ErrorKind::InvalidData, err)),
-        }
+        let mut configs: Configs = serde_json::from_str(content.as_ref())
+            .map_err(|error| Error::new(ErrorKind::InvalidData, error))?;
+        Self::expand_path(&mut configs.internal.cached);
+        Self::expand_path(&mut configs.internal.updated);
+        Self::expand_path(&mut configs.configurable.ignored_paths.value);
+        Ok(configs)
+    }
+
+    fn expand_path(paths: &mut Set<PathBuf>) {
+        let expanded = paths
+            .iter()
+            .filter_map(|path| Some(utils::expand_tilde(path.to_str()?)))
+            .collect();
+        *paths = expanded;
     }
 
     /// Get ignored path
-    pub fn get_ignore_paths(&self) -> Set<PathBuf> {
-        self.file[Self::CONFIGURABLE_KEY][Self::IGNORE_KEY][Self::VALUES_KEY]
-            .as_vec()
-            .map(Self::convert_and_box)
-            .unwrap_or_default()
+    pub fn get_ignore_paths(&self) -> &Set<PathBuf> {
+        &self.configurable.ignored_paths.value
     }
 
     /// Get paths need to be cached
-    pub fn get_internal_cached(&self) -> Set<PathBuf> {
-        self.file[Self::INTERNAL_KEY][Self::CACHED_KEY]
-            .as_vec()
-            .map(Self::convert_and_box)
-            .unwrap_or_default()
+    pub fn get_internal_cached(&self) -> &Set<PathBuf> {
+        &self.internal.cached
     }
 
     /// Get paths that updates every time
-    pub fn get_internal_updated(&self) -> Set<PathBuf> {
-        self.file[Self::INTERNAL_KEY][Self::UPDATED_KEY]
-            .as_vec()
-            .map(Self::convert_and_box)
-            .unwrap_or_default()
+    pub fn get_internal_updated(&self) -> &Set<PathBuf> {
+        &self.internal.updated
     }
 
-    pub fn get_pref_names(&self) -> HashMap<String, String> {
-        let names = self.file[Self::INTERNAL_KEY][Self::PREFNAME_KEY].as_hash();
-        if names.is_none() {
-            return HashMap::new();
-        }
-        let names = names.unwrap();
-        names
-            .into_iter()
-            .filter_map(|(key, val)| Some((key.as_str()?.to_owned(), val.as_str()?.to_owned())))
-            .collect()
-    }
-
-    /// Convert yaml data to str and box with vec
-    fn convert_and_box(data: &Vec<Yaml>) -> Set<PathBuf> {
-        data.iter()
-            .filter_map(Yaml::as_str)
-            .map(utils::expand_tilde)
-            .map(PathBuf::from)
-            .collect()
+    pub fn get_pref_names(&self) -> &HashMap<String, String> {
+        &self.internal.preferred_names
     }
 }
 
 #[cfg(test)]
-mod configs_test {
+pub mod configs_test {
     use crate::configurator::configs::Configs;
 
-    fn get_content() -> String {
-        std::fs::read_to_string("settings.yaml").expect("Failed to read settings.yaml")
+    pub fn get_content() -> String {
+        r#"
+{
+  "configurable": {
+    "ignorePaths": {
+      "displayName": "Paths to Ignore",
+      "value": []
+    }
+  },
+  "internal": {
+    "cached": [
+      "/System/Library/CoreServices/Finder.app",
+      "/System/Library/CoreServices/Applications",
+      "/System/Library/PreferencePanes",
+      "/System/Applications"
+    ],
+    "updated": ["~/Applications", "/Applications"],
+    "prefNames": {
+      "SoftwareUpdate": "Software Update",
+      "iCloudPref": "iCloud",
+      "Accounts": "Users & Groups",
+      "AppStore": "App Store",
+      "Appearance": "General",
+      "DateAndTime": "Date & Time",
+      "DesktopScreenEffectsPref": "Desktop & Screen Saver",
+      "DigiHubDiscs": "CDs & DVDs",
+      "EnergySaver": "Energy Saver",
+      "Expose": "Mission Control",
+      "FibreChannel": "Fibre Channel",
+      "InternetAccounts": "Internet Accounts",
+      "Localization": "Language & Region",
+      "ParentalControls": "Parental Controls",
+      "PrintAndFax": "Printers & Fax",
+      "PrintAndScan": "Printers & Scanners",
+      "Security": "Security & Privacy",
+      "SharingPref": "Sharing",
+      "Speech": "Siri",
+      "StartupDisk": "Startup Disk",
+      "TimeMachine": "Time Machine",
+      "TouchID": "Touch ID",
+      "UniversalAccessPref": "Accessibility",
+      "Wallet": "Wallet & Apple Pay",
+      "AppleIDPrefPane": "Apple ID",
+      "FamilySharingPrefPane": "Family Sharing"
+    }
+  }
+}"#
+        .to_owned()
     }
 
     #[test]
     fn test_new() {
         let res = Configs::from(get_content());
-        assert!(res.is_ok());
+        assert!(res.is_ok(), res.err().unwrap().to_string());
     }
 
     #[test]
