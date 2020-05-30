@@ -33,6 +33,7 @@ impl<'a> QueryProcessor<'a> {
 
     /// Async query
     async fn async_query(&self, req: &str) -> Vec<u8> {
+        let req = req.to_lowercase();
         let (cached_services, updated_services) = join(
             self.query_cached_services(&req),
             self.query_updated_services(&req),
