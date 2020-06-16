@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 
 use crate::utils;
+use crate::utils::serde::deserialize_from_bytes;
 
 #[derive(Deserialize)]
 pub struct Configs {
@@ -14,8 +15,8 @@ pub struct Configs {
 
 #[derive(Deserialize)]
 struct Internal {
-    cached: Set<PathBuf>,
-    updated: Set<PathBuf>,
+    system: Set<PathBuf>,
+    users: Set<PathBuf>,
     #[serde(rename = "prefNames")]
     preferred_names: HashMap<String, String>,
 }
@@ -34,10 +35,10 @@ struct ConfigurableValue {
 impl Configs {
     /// Construct config from given yaml file
     pub fn from<S: AsRef<str>>(content: S) -> io::Result<Self> {
-        let mut configs: Configs = serde_json::from_str(content.as_ref())
+        let mut configs: Configs = deserialize_from_bytes(content.as_ref().as_bytes())
             .map_err(|error| Error::new(ErrorKind::InvalidData, error))?;
-        Self::expand_path(&mut configs.internal.cached);
-        Self::expand_path(&mut configs.internal.updated);
+        Self::expand_path(&mut configs.internal.system);
+        Self::expand_path(&mut configs.internal.users);
         Self::expand_path(&mut configs.configurable.ignored_paths.value);
         Ok(configs)
     }
@@ -56,13 +57,13 @@ impl Configs {
     }
 
     /// Get paths need to be cached
-    pub fn get_internal_cached(&self) -> &Set<PathBuf> {
-        &self.internal.cached
+    pub fn get_system_paths(&self) -> &Set<PathBuf> {
+        &self.internal.system
     }
 
     /// Get paths that updates every time
-    pub fn get_internal_updated(&self) -> &Set<PathBuf> {
-        &self.internal.updated
+    pub fn get_users_paths(&self) -> &Set<PathBuf> {
+        &self.internal.users
     }
 
     pub fn get_pref_names(&self) -> &HashMap<String, String> {
@@ -84,13 +85,13 @@ pub mod configs_test {
     }
   },
   "internal": {
-    "cached": [
+    "system": [
       "/System/Library/CoreServices/Finder.app",
       "/System/Library/CoreServices/Applications",
       "/System/Library/PreferencePanes",
       "/System/Applications"
     ],
-    "updated": ["~/Applications", "/Applications"],
+    "users": ["~/Applications", "/Applications"],
     "prefNames": {
       "SoftwareUpdate": "Software Update",
       "iCloudPref": "iCloud",
@@ -138,16 +139,16 @@ pub mod configs_test {
     }
 
     #[test]
-    fn test_get_cached_paths() {
+    fn test_get_system_paths() {
         let res = Configs::from(get_content()).unwrap();
-        let cached_path = res.get_internal_cached();
+        let cached_path = res.get_system_paths();
         assert_eq!(cached_path.len(), 4);
     }
 
     #[test]
-    fn test_get_updated_paths() {
+    fn test_get_users_paths() {
         let res = Configs::from(get_content()).unwrap();
-        let updated_path = res.get_internal_updated();
+        let updated_path = res.get_users_paths();
         assert_eq!(updated_path.len(), 2);
     }
 
