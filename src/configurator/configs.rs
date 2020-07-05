@@ -15,8 +15,7 @@ pub struct Configs {
 
 #[derive(Deserialize)]
 struct Internal {
-    system: Set<PathBuf>,
-    users: Set<PathBuf>,
+    paths: Vec<PathBuf>,
     #[serde(rename = "prefNames")]
     preferred_names: HashMap<String, String>,
 }
@@ -32,23 +31,24 @@ struct ConfigurableValue {
     value: Set<PathBuf>,
 }
 
+macro_rules! expand_path {
+    ($paths: expr) => {
+        let expanded = $paths
+            .iter()
+            .filter_map(|path| Some(utils::expand_tilde(path.to_str()?)))
+            .collect();
+        *$paths = expanded;
+    };
+}
+
 impl Configs {
     /// Construct config from given yaml file
     pub fn from<S: AsRef<str>>(content: S) -> io::Result<Self> {
         let mut configs: Configs = deserialize_from_bytes(content.as_ref().as_bytes())
             .map_err(|error| Error::new(ErrorKind::InvalidData, error))?;
-        Self::expand_path(&mut configs.internal.system);
-        Self::expand_path(&mut configs.internal.users);
-        Self::expand_path(&mut configs.configurable.ignored_paths.value);
+        expand_path!(&mut configs.internal.paths);
+        expand_path!(&mut configs.configurable.ignored_paths.value);
         Ok(configs)
-    }
-
-    fn expand_path(paths: &mut Set<PathBuf>) {
-        let expanded = paths
-            .iter()
-            .filter_map(|path| Some(utils::expand_tilde(path.to_str()?)))
-            .collect();
-        *paths = expanded;
     }
 
     /// Get ignored path
@@ -57,13 +57,8 @@ impl Configs {
     }
 
     /// Get paths need to be cached
-    pub fn get_system_paths(&self) -> &Set<PathBuf> {
-        &self.internal.system
-    }
-
-    /// Get paths that updates every time
-    pub fn get_users_paths(&self) -> &Set<PathBuf> {
-        &self.internal.users
+    pub fn get_paths(&self) -> &Vec<PathBuf> {
+        &self.internal.paths
     }
 
     pub fn get_pref_names(&self) -> &HashMap<String, String> {
@@ -85,13 +80,14 @@ pub mod configs_test {
     }
   },
   "internal": {
-    "system": [
+    "paths": [
       "/System/Library/CoreServices/Finder.app",
       "/System/Library/CoreServices/Applications",
       "/System/Library/PreferencePanes",
-      "/System/Applications"
+      "/System/Applications",
+      "~/Applications", 
+      "/Applications"
     ],
-    "users": ["~/Applications", "/Applications"],
     "prefNames": {
       "SoftwareUpdate": "Software Update",
       "iCloudPref": "iCloud",
@@ -141,15 +137,8 @@ pub mod configs_test {
     #[test]
     fn test_get_system_paths() {
         let res = Configs::from(get_content()).unwrap();
-        let cached_path = res.get_system_paths();
-        assert_eq!(cached_path.len(), 4);
-    }
-
-    #[test]
-    fn test_get_users_paths() {
-        let res = Configs::from(get_content()).unwrap();
-        let updated_path = res.get_users_paths();
-        assert_eq!(updated_path.len(), 2);
+        let cached_path = res.get_paths();
+        assert_eq!(cached_path.len(), 6);
     }
 
     #[test]
